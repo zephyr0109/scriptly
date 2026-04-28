@@ -1,0 +1,63 @@
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    container_name: scriptly-db
+    restart: always
+    environment:
+      POSTGRES_USER: scriptly_user
+      POSTGRES_PASSWORD: scriptly_password
+      POSTGRES_DB: scriptly_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    container_name: scriptly-cache
+    restart: always
+    ports:
+      - "6379:6379"
+
+  api:
+    image: zephyr0109/scriptly-api:latest
+    build:
+      context: ./scriptly-api
+      dockerfile: Dockerfile
+    container_name: scriptly-api
+    restart: always
+    ports:
+      - "8100:8000"
+    environment:
+      - POSTGRES_HOST=scriptly-db
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=scriptly_user
+      - POSTGRES_PASSWORD=scriptly_password
+      - POSTGRES_DB=scriptly_db
+      - REDIS_URL=redis://scriptly-cache:6379/0
+      - NAVER_CLIENT_ID=${NAVER_CLIENT_ID}
+      - NAVER_CLIENT_SECRET=${NAVER_CLIENT_SECRET}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - GEMINI_MODEL_NAME=${GEMINI_MODEL_NAME}
+    depends_on:
+      - db
+      - redis
+
+  web:
+    image: zephyr0109/scriptly-web:latest
+    build:
+      context: ./scriptly-web
+      dockerfile: Dockerfile
+      args:
+        - NEXT_PUBLIC_API_URL=http://zephyr0109.duckdns.org:8100
+    container_name: scriptly-web
+    restart: always
+    ports:
+      - "3100:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://zephyr0109.duckdns.org:8100
+    depends_on:
+      - api
+
+volumes:
+  postgres_data:

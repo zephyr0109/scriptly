@@ -1,0 +1,10 @@
+fastapi
+uvicorn[standard]
+sqlalchemy[asyncio]
+psycopg2-binary
+asyncpg
+pydantic-settings
+httpx
+google-generativeai
+python-dotenv
+alembic

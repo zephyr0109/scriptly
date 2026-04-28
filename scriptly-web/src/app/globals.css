@@ -1,0 +1,62 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0a0a0a;
+    --foreground: #ededed;
+  }
+}
+
+body {
+  color: var(--foreground);
+  background: var(--background);
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+/* --- 커스텀 스크롤바 가시성 극대화 --- */
+@layer utilities {
+  .custom-scrollbar-light::-webkit-scrollbar {
+    width: 10px;
+  }
+  .custom-scrollbar-light::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 10px;
+  }
+  .custom-scrollbar-light::-webkit-scrollbar-thumb {
+    background: #c1c1c1;
+    border-radius: 10px;
+    border: 3px solid #f1f1f1;
+  }
+  .custom-scrollbar-light::-webkit-scrollbar-thumb:hover {
+    background: #a1a1a1;
+  }
+
+  .custom-scrollbar-dark::-webkit-scrollbar {
+    width: 10px;
+  }
+  .custom-scrollbar-dark::-webkit-scrollbar-track {
+    background: #0f0f0f;
+    border-radius: 10px;
+  }
+  .custom-scrollbar-dark::-webkit-scrollbar-thumb {
+    background: #3f3f46;
+    border-radius: 10px;
+    border: 3px solid #0f0f0f;
+  }
+  .custom-scrollbar-dark::-webkit-scrollbar-thumb:hover {
+    background: #52525b;
+  }
+}
+
+/* --- React Flow 커스텀 스타일 --- */
+.react-flow__edge.selected .react-flow__edge-path {
+  stroke: #6366f1 !important; /* Indigo 500 */
+  stroke-width: 3 !important;
+}

@@ -1,0 +1,29 @@
+[project]
+name = "scriptly-api"
+version = "0.1.0"
+description = "Scriptly API - AI Agent for Drama Writers"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.115.0",
+    "uvicorn>=0.30.0",
+    "sqlalchemy[asyncio]>=2.0.30",
+    "asyncpg>=0.29.0",
+    "pydantic>=2.7.0",
+    "pydantic-settings>=2.2.0",
+    "httpx>=0.27.0",
+    "python-dotenv>=1.0.1",
+    "feedparser>=6.0.11",
+    "beautifulsoup4>=4.12.3",
+    "redis>=7.3.0",
+    "pypdf>=6.9.1",
+    "python-docx>=1.2.0",
+    "python-multipart>=0.0.22",
+    "google-genai>=1.68.0",
+]
+
+[tool.uv]
+dev-dependencies = [
+    "pytest>=8.0.0",
+    "alembic>=1.13.0",
+]

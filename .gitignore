@@ -37,3 +37,5 @@ scriptly-docs/plan/*
 data/output/*
 scriptly-api/uploads/*
 scriptly-api/data/output/*
+
+.gemini/skills/*

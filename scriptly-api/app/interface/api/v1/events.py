@@ -6,30 +6,48 @@ import uuid
 import logging
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.future import select
 from typing import List
 
 from app.infrastructure.database import get_db
-from app.domain.schemas import ProjectEventRead, ProjectEventCreate, ProjectEventUpdate
+from app.domain.models import ProjectModel, UserModel, ProjectEventModel
+from app.domain.schemas import ProjectEventRead, ProjectEventCreate, ProjectEventUpdate, UserRole
 from app.application.services.event_service import EventService
+from app.application.services.auth_service import AuthService
 
 router = APIRouter(prefix="/projects", tags=["events"])
 logger = logging.getLogger(__name__)
 event_service = EventService()
 
+# --- 권한 도우미 ---
+async def verify_project_access(project_id: uuid.UUID, current_user: UserModel, db: AsyncSession):
+    stmt = select(ProjectModel).where(ProjectModel.id == project_id)
+    result = await db.execute(stmt)
+    project = result.scalar_one_or_none()
+    if not project: raise HTTPException(status_code=404, detail="Project not found")
+    if current_user.role != UserRole.ADMIN and project.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="권한이 없습니다.")
+    return project
+
 @router.get("/{project_id}/events", response_model=List[ProjectEventRead])
-async def get_project_events(project_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
-    """프로젝트별 모든 사건 리스트를 가져옵니다."""
-    logger.info(f"API Request: get_project_events called for project_id: {project_id}")
+async def get_project_events(
+    project_id: uuid.UUID, 
+    current_user: UserModel = Depends(AuthService.get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """프로젝트별 모든 사건 리스트 조회"""
+    await verify_project_access(project_id, current_user, db)
     return await event_service.get_events(db, project_id)
 
 @router.post("/{project_id}/events", response_model=ProjectEventRead)
 async def create_project_event(
     project_id: uuid.UUID,
     event_in: ProjectEventCreate,
+    current_user: UserModel = Depends(AuthService.get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
-    """프로젝트에 새로운 사건을 추가합니다."""
-    logger.info(f"API Request: create_project_event called for project_id: {project_id}")
+    """프로젝트에 새로운 사건 추가"""
+    await verify_project_access(project_id, current_user, db)
     if project_id != event_in.project_id:
         raise HTTPException(status_code=400, detail="Project ID mismatch")
     return await event_service.create_event(db, event_in)
@@ -38,16 +56,32 @@ async def create_project_event(
 async def update_project_event(
     event_id: uuid.UUID,
     event_in: ProjectEventUpdate,
+    current_user: UserModel = Depends(AuthService.get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
-    """특정 사건을 수정합니다."""
-    logger.info(f"API Request: update_project_event called for event_id: {event_id}")
+    """특정 사건 수정"""
+    # 이벤트 -> 프로젝트 권한 확인
+    stmt = select(ProjectEventModel).where(ProjectEventModel.id == event_id)
+    result = await db.execute(stmt)
+    event = result.scalar_one_or_none()
+    if not event: raise HTTPException(status_code=404, detail="Event not found")
+    await verify_project_access(event.project_id, current_user, db)
+    
     return await event_service.update_event(db, event_id, event_in)
 
 @router.delete("/events/{event_id}")
-async def delete_project_event(event_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
-    """사건을 삭제합니다."""
-    logger.info(f"API Request: delete_project_event called for event_id: {event_id}")
+async def delete_project_event(
+    event_id: uuid.UUID, 
+    current_user: UserModel = Depends(AuthService.get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """사건 삭제"""
+    stmt = select(ProjectEventModel).where(ProjectEventModel.id == event_id)
+    result = await db.execute(stmt)
+    event = result.scalar_one_or_none()
+    if not event: return {"status": "success"}
+    await verify_project_access(event.project_id, current_user, db)
+    
     await event_service.delete_event(db, event_id)
     return {"status": "success"}
 
@@ -55,17 +89,19 @@ async def delete_project_event(event_id: uuid.UUID, db: AsyncSession = Depends(g
 async def reorder_project_events(
     project_id: uuid.UUID,
     event_ids: List[uuid.UUID],
+    current_user: UserModel = Depends(AuthService.get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
-    """사건의 순서를 일괄 조정합니다."""
-    logger.info(f"API Request: reorder_project_events called for project_id: {project_id}")
+    """사건 순서 일괄 조정"""
+    await verify_project_access(project_id, current_user, db)
     return await event_service.reorder_events(db, project_id, event_ids)
 
 @router.post("/{project_id}/events/generate-draft", response_model=List[ProjectEventRead])
 async def generate_project_plot_draft(
     project_id: uuid.UUID,
+    current_user: UserModel = Depends(AuthService.get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
-    """AI를 사용하여 프로젝트의 플롯(사건 흐름) 초안을 생성합니다."""
-    logger.info(f"API Request: generate_project_plot_draft called for project_id: {project_id}")
+    """AI를 사용하여 플롯 초안 생성"""
+    await verify_project_access(project_id, current_user, db)
     return await event_service.generate_plot_draft(db, project_id)

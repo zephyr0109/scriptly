@@ -38,15 +38,43 @@ class RelationType(str, Enum):
     FAMILY = "FAMILY"
     NEUTRAL = "NEUTRAL"
 
+class UserRole(str, Enum):
+    ADMIN = "ADMIN"
+    USER = "USER"
+
 # --- Base Schemas ---
 
 class DomainModel(BaseModel):
     model_config = ConfigDict(from_attributes=True)
+# --- User & Auth ---
+
+class UserBase(DomainModel):
+    email: str
+    full_name: Optional[str] = None
+    role: UserRole = UserRole.USER
+
+class UserCreate(UserBase):
+    password: str
+
+class UserRead(UserBase):
+    id: UUID
+    role: UserRole
+    is_active: bool
+    created_at: datetime
+    updated_at: datetime
+
+class Token(BaseModel):
+    access_token: str
+    token_type: str
+
+class TokenData(BaseModel):
+    email: Optional[str] = None
 
 # --- Source & Elements ---
 
 class Source(DomainModel):
     id: UUID = Field(default_factory=uuid4)
+    user_id: Optional[UUID] = None # Added for isolation
     type: SourceType
     title: str
     summary: Optional[str] = None

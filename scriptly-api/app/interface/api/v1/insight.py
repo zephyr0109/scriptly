@@ -4,125 +4,222 @@
 """
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.future import select
 from typing import List, Dict, Any
 import uuid
 import logging
 
-from app.domain.schemas import CanvasBoard, CanvasNode, CanvasEdge
+from app.domain.schemas import CanvasBoard, CanvasNode, CanvasEdge, UserRole
 from app.infrastructure.database import get_db
+from app.domain.models import ProjectModel, UserModel, CanvasBoardModel, CanvasNodeModel, CanvasEdgeModel, SourceModel
 from app.application.services.insight_service import InsightService
+from app.application.services.auth_service import AuthService
 
 router = APIRouter(prefix="/insight", tags=["Insight Lab"])
 logger = logging.getLogger(__name__)
 insight_service = InsightService()
 
+# --- 권한 도우미 ---
+async def verify_project_access(project_id: uuid.UUID, current_user: UserModel, db: AsyncSession):
+    """특정 프로젝트에 대한 사용자의 접근 권한을 확인합니다."""
+    stmt = select(ProjectModel).where(ProjectModel.id == project_id)
+    result = await db.execute(stmt)
+    project = result.scalar_one_or_none()
+    
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    
+    if current_user.role != UserRole.ADMIN and project.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="프로젝트에 대한 권한이 없습니다.")
+    return project
+
+async def verify_board_access(board_id: uuid.UUID, current_user: UserModel, db: AsyncSession):
+    """보드 소유권을 확인합니다 (프로젝트를 통해)."""
+    stmt = select(CanvasBoardModel).where(CanvasBoardModel.id == board_id)
+    result = await db.execute(stmt)
+    board = result.scalar_one_or_none()
+    
+    if not board:
+        raise HTTPException(status_code=404, detail="Board not found")
+    
+    await verify_project_access(board.project_id, current_user, db)
+    return board
+
 # --- Board ---
 @router.post("/board", response_model=CanvasBoard, status_code=status.HTTP_201_CREATED)
-async def create_board(board: CanvasBoard, db: AsyncSession = Depends(get_db)):
-    """새로운 캔버스 보드(연구 세션) 생성"""
-    logger.info(f"API Request: create_board called for project_id: {board.project_id}")
+async def create_board(
+    board: CanvasBoard, 
+    current_user: UserModel = Depends(AuthService.get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """새로운 캔버스 보드 생성"""
+    await verify_project_access(board.project_id, current_user, db)
     db_obj = await insight_service.create_board(db, board)
     return CanvasBoard.model_validate(db_obj)
 
 @router.get("/boards/{project_id}", response_model=List[CanvasBoard])
-async def get_boards(project_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
-    """특정 프로젝트의 캔버스 보드 목록 조회"""
-    logger.info(f"API Request: get_boards called for project_id: {project_id}")
+async def get_boards(
+    project_id: uuid.UUID, 
+    current_user: UserModel = Depends(AuthService.get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """프로젝트 보드 목록 조회"""
+    await verify_project_access(project_id, current_user, db)
     boards = await insight_service.get_boards(db, project_id)
     return [CanvasBoard.model_validate(b) for b in boards]
 
 # --- Node ---
 @router.post("/node", response_model=CanvasNode, status_code=status.HTTP_201_CREATED)
-async def create_node(node: CanvasNode, db: AsyncSession = Depends(get_db)):
-    """보관함에서 드래그하여 캔버스에 노드 생성"""
-    logger.info(f"API Request: create_node called for board_id: {node.board_id}")
+async def create_node(
+    node: CanvasNode, 
+    current_user: UserModel = Depends(AuthService.get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """캔버스 노드 생성"""
+    await verify_board_access(node.board_id, current_user, db)
     db_obj = await insight_service.create_node(db, node)
     return CanvasNode.model_validate(db_obj)
 
 @router.get("/nodes/{board_id}", response_model=List[CanvasNode])
-async def get_nodes(board_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
-    """해당 보드의 모든 노드 포지션/데이터 조회"""
-    logger.info(f"API Request: get_nodes called for board_id: {board_id}")
+async def get_nodes(
+    board_id: uuid.UUID, 
+    current_user: UserModel = Depends(AuthService.get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """보드 노드 조회"""
+    await verify_board_access(board_id, current_user, db)
     nodes = await insight_service.get_nodes(db, board_id)
     return [CanvasNode.model_validate(n) for n in nodes]
 
 @router.patch("/node/{node_id}", response_model=CanvasNode)
-async def update_node(node_id: uuid.UUID, node_data: dict, db: AsyncSession = Depends(get_db)):
-    """노드 이동, 리사이즈, 데이터 등 실시간 수정"""
-    logger.info(f"API Request: update_node called for node_id: {node_id}")
+async def update_node(
+    node_id: uuid.UUID, 
+    node_data: dict, 
+    current_user: UserModel = Depends(AuthService.get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """노드 수정"""
+    # 노드 -> 보드 -> 프로젝트 권한 확인
+    stmt = select(CanvasNodeModel).where(CanvasNodeModel.id == node_id)
+    result = await db.execute(stmt)
+    node = result.scalar_one_or_none()
+    if not node: raise HTTPException(status_code=404, detail="Node not found")
+    await verify_board_access(node.board_id, current_user, db)
+    
     db_obj = await insight_service.update_node(db, node_id, node_data)
-    if not db_obj: raise HTTPException(status_code=404, detail="Node not found")
     return CanvasNode.model_validate(db_obj)
 
 @router.delete("/node/{node_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_node(node_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
-    """노드 삭제 (보관함 원본은 유지됨)"""
-    logger.info(f"API Request: delete_node called for node_id: {node_id}")
+async def delete_node(
+    node_id: uuid.UUID, 
+    current_user: UserModel = Depends(AuthService.get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """노드 삭제"""
+    stmt = select(CanvasNodeModel).where(CanvasNodeModel.id == node_id)
+    result = await db.execute(stmt)
+    node = result.scalar_one_or_none()
+    if not node: return None
+    await verify_board_access(node.board_id, current_user, db)
+    
     await insight_service.delete_node(db, node_id)
     return None
 
 # --- Edge ---
 @router.post("/edge", response_model=CanvasEdge, status_code=status.HTTP_201_CREATED)
-async def create_edge(edge: CanvasEdge, db: AsyncSession = Depends(get_db)):
-    """노드 간 수동 연결선(Edge) 생성"""
-    logger.info(f"API Request: create_edge called for board_id: {edge.board_id}")
+async def create_edge(
+    edge: CanvasEdge, 
+    current_user: UserModel = Depends(AuthService.get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """연결선 생성"""
+    await verify_board_access(edge.board_id, current_user, db)
     db_obj = await insight_service.create_edge(db, edge)
     return CanvasEdge.model_validate(db_obj)
 
 @router.get("/edges/{board_id}", response_model=List[CanvasEdge])
-async def get_edges(board_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
-    """해당 보드의 모든 연결선 조회"""
-    logger.info(f"API Request: get_edges called for board_id: {board_id}")
+async def get_edges(
+    board_id: uuid.UUID, 
+    current_user: UserModel = Depends(AuthService.get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """연결선 조회"""
+    await verify_board_access(board_id, current_user, db)
     edges = await insight_service.get_edges(db, board_id)
     return [CanvasEdge.model_validate(e) for e in edges]
 
 @router.patch("/edge/{edge_id}", response_model=CanvasEdge)
-async def update_edge(edge_id: uuid.UUID, edge_data: dict, db: AsyncSession = Depends(get_db)):
-    """Edge의 라벨(작가의 관계 메모) 등 수정"""
-    logger.info(f"API Request: update_edge called for edge_id: {edge_id}")
+async def update_edge(
+    edge_id: uuid.UUID, 
+    edge_data: dict, 
+    current_user: UserModel = Depends(AuthService.get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """연결선 수정"""
+    stmt = select(CanvasEdgeModel).where(CanvasEdgeModel.id == edge_id)
+    result = await db.execute(stmt)
+    edge = result.scalar_one_or_none()
+    if not edge: raise HTTPException(status_code=404, detail="Edge not found")
+    await verify_board_access(edge.board_id, current_user, db)
+    
     db_obj = await insight_service.update_edge(db, edge_id, edge_data)
-    if not db_obj: raise HTTPException(status_code=404, detail="Edge not found")
     return CanvasEdge.model_validate(db_obj)
 
 @router.delete("/edge/{edge_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_edge(edge_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
+async def delete_edge(
+    edge_id: uuid.UUID, 
+    current_user: UserModel = Depends(AuthService.get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
     """연결선 삭제"""
-    logger.info(f"API Request: delete_edge called for edge_id: {edge_id}")
+    stmt = select(CanvasEdgeModel).where(CanvasEdgeModel.id == edge_id)
+    result = await db.execute(stmt)
+    edge = result.scalar_one_or_none()
+    if not edge: return None
+    await verify_board_access(edge.board_id, current_user, db)
+    
     await insight_service.delete_edge(db, edge_id)
     return None
 
 @router.post("/session/{board_id}")
-async def save_session(board_id: uuid.UUID, payload: dict, db: AsyncSession = Depends(get_db)):
-    """현재 캔버스의 모든 노드와 엣지 상태를 통째로 저장"""
-    logger.info(f"API Request: save_session called for board_id: {board_id}")
+async def save_session(
+    board_id: uuid.UUID, 
+    payload: dict, 
+    current_user: UserModel = Depends(AuthService.get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """세션 저장"""
+    await verify_board_access(board_id, current_user, db)
     nodes_data = payload.get("nodes", [])
     edges_data = payload.get("edges", [])
-    
     nodes = [CanvasNode(**n) for n in nodes_data]
     edges = [CanvasEdge(**e) for e in edges_data]
-    
     await insight_service.save_session(db, board_id, nodes, edges)
     return {"status": "success"}
 
 @router.post("/generate-map-draft/{project_id}")
-async def generate_map_draft(project_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
-    """AI를 사용하여 캐릭터와 관계도 초안을 한 번에 생성 및 DB 저장"""
-    logger.info(f"API Request: generate_map_draft called for project_id: {project_id}")
+async def generate_map_draft(
+    project_id: uuid.UUID, 
+    current_user: UserModel = Depends(AuthService.get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """AI를 통한 초안 생성"""
+    await verify_project_access(project_id, current_user, db)
     try:
         result = await insight_service.generate_map_draft(db, project_id)
         return result
     except Exception as e:
-        logger.error(f"Error in generate_map_draft: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Error in generate_map_draft: {e}")
+        raise HTTPException(status_code=500, detail="AI 초안 생성 실패")
 
-# --- On-Demand AI ---
 @router.post("/synthesize-on-demand")
 async def synthesize_on_demand(
-    payload: dict, # { "node_ids": ["..."], "instruction": "..." }
+    payload: dict,
+    current_user: UserModel = Depends(AuthService.get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
-    """(작가의 명시적 호출 시) 선택한 카드들을 모아 AI 초안 생성"""
-    logger.info("API Request: synthesize_on_demand called")
+    """AI 합성 (선택된 노드 및 소스 권한 검증 포함)"""
+    logger.info(f"API Request: synthesize_on_demand by user: {current_user.id}")
     node_ids = payload.get("node_ids", [])
     source_ids = payload.get("source_ids", [])
     instruction = payload.get("instruction", "")
@@ -131,6 +228,31 @@ async def synthesize_on_demand(
     
     node_uuids = [uuid.UUID(nid) for nid in node_ids] if node_ids else None
     source_uuids = [uuid.UUID(sid) for sid in source_ids] if source_ids else None
+    
+    if current_user.role != UserRole.ADMIN:
+        # 1. 노드 권한 확인 (각 노드가 속한 보드/프로젝트가 현재 사용자의 것인지 검증)
+        if node_uuids:
+            stmt = select(CanvasNodeModel).where(CanvasNodeModel.id.in_(node_uuids))
+            res = await db.execute(stmt)
+            nodes = res.scalars().all()
+            if len(nodes) != len(node_uuids):
+                raise HTTPException(status_code=404, detail="일부 노드를 찾을 수 없습니다.")
+            
+            board_ids = {n.board_id for n in nodes}
+            for bid in board_ids:
+                await verify_board_access(bid, current_user, db)
+                
+        # 2. 직접 전달된 소스 권한 확인
+        if source_uuids:
+            stmt = select(SourceModel).where(SourceModel.id.in_(source_uuids))
+            res = await db.execute(stmt)
+            sources = res.scalars().all()
+            if len(sources) != len(source_uuids):
+                raise HTTPException(status_code=404, detail="일부 영감 자료를 찾을 수 없습니다.")
+            
+            for s in sources:
+                if s.user_id != current_user.id:
+                    raise HTTPException(status_code=403, detail="요청한 영감 자료에 대한 권한이 없습니다.")
         
     result = await insight_service.synthesize_on_demand(db, node_uuids, instruction, source_uuids, genre, tone)
     return result

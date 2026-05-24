@@ -9,10 +9,11 @@ from typing import List
 import uuid
 import logging
 
-from app.domain.schemas import CharacterCreate, CharacterRead, CharacterUpdate
+from app.domain.schemas import CharacterCreate, CharacterRead, CharacterUpdate, UserRole
 from app.infrastructure.database import get_db
-from app.domain.models import CharacterModel
+from app.domain.models import CharacterModel, ProjectModel, UserModel
 from app.application.services.character_service import CharacterService
+from app.application.services.auth_service import AuthService
 
 router = APIRouter(prefix="/characters", tags=["Character Map"])
 logger = logging.getLogger(__name__)
@@ -23,17 +24,36 @@ from pydantic import BaseModel
 class SyncRequest(BaseModel):
     source_ids: List[uuid.UUID]
 
+# --- 권한 도우미 ---
+async def verify_project_access(project_id: uuid.UUID, current_user: UserModel, db: AsyncSession):
+    stmt = select(ProjectModel).where(ProjectModel.id == project_id)
+    result = await db.execute(stmt)
+    project = result.scalar_one_or_none()
+    if not project: raise HTTPException(status_code=404, detail="Project not found")
+    if current_user.role != UserRole.ADMIN and project.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="권한이 없습니다.")
+    return project
+
 @router.post("/sync-from-sources/{project_id}", response_model=List[CharacterRead])
-async def sync_characters(project_id: uuid.UUID, request: SyncRequest, db: AsyncSession = Depends(get_db)):
-    """연결된 영감 자료(소스)에서 캐릭터 정보를 자동으로 추출하여 동기화"""
-    logger.info(f"API Request: sync_characters called for project_id: {project_id}")
+async def sync_characters(
+    project_id: uuid.UUID, 
+    request: SyncRequest, 
+    current_user: UserModel = Depends(AuthService.get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """연결된 영감 자료에서 캐릭터 자동 추출"""
+    await verify_project_access(project_id, current_user, db)
     chars = await char_service.sync_from_sources(db, project_id, request.source_ids)
     return [CharacterRead.model_validate(c) for c in chars]
 
 @router.post("", response_model=CharacterRead, status_code=status.HTTP_201_CREATED)
-async def create_character(char: CharacterCreate, db: AsyncSession = Depends(get_db)):
-    """새로운 캐릭터 생성 (수동 추가)"""
-    logger.info(f"API Request: create_character called with name: {char.name}")
+async def create_character(
+    char: CharacterCreate, 
+    current_user: UserModel = Depends(AuthService.get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """캐릭터 생성"""
+    await verify_project_access(char.project_id, current_user, db)
     db_obj = CharacterModel(**char.model_dump())
     db.add(db_obj)
     await db.commit()
@@ -41,36 +61,46 @@ async def create_character(char: CharacterCreate, db: AsyncSession = Depends(get
     return CharacterRead.model_validate(db_obj)
 
 @router.get("/project/{project_id}", response_model=List[CharacterRead])
-async def get_project_characters(project_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
-    """특정 프로젝트의 모든 캐릭터 조회"""
-    logger.info(f"API Request: get_project_characters called for project_id: {project_id}")
+async def get_project_characters(
+    project_id: uuid.UUID, 
+    current_user: UserModel = Depends(AuthService.get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """프로젝트 캐릭터 목록 조회"""
+    await verify_project_access(project_id, current_user, db)
     stmt = select(CharacterModel).where(CharacterModel.project_id == project_id).order_by(CharacterModel.created_at.asc())
     result = await db.execute(stmt)
     return [CharacterRead.model_validate(c) for c in result.scalars().all()]
 
 @router.patch("/{char_id}", response_model=CharacterRead)
-async def update_character(char_id: uuid.UUID, char_data: CharacterUpdate, db: AsyncSession = Depends(get_db)):
-    """캐릭터 설정 수정"""
-    logger.info(f"API Request: update_character called for char_id: {char_id}")
+async def update_character(
+    char_id: uuid.UUID, 
+    char_data: CharacterUpdate, 
+    current_user: UserModel = Depends(AuthService.get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """캐릭터 수정"""
     db_obj = await db.get(CharacterModel, char_id)
-    if not db_obj:
-        raise HTTPException(status_code=404, detail="Character not found")
+    if not db_obj: raise HTTPException(status_code=404, detail="Character not found")
+    await verify_project_access(db_obj.project_id, current_user, db)
     
     update_data = char_data.model_dump(exclude_unset=True)
     for key, value in update_data.items():
         setattr(db_obj, key, value)
-    
     await db.commit()
     await db.refresh(db_obj)
     return CharacterRead.model_validate(db_obj)
 
 @router.delete("/{char_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_character(char_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
+async def delete_character(
+    char_id: uuid.UUID, 
+    current_user: UserModel = Depends(AuthService.get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
     """캐릭터 삭제"""
-    logger.info(f"API Request: delete_character called for char_id: {char_id}")
     db_obj = await db.get(CharacterModel, char_id)
-    if not db_obj:
-        raise HTTPException(status_code=404, detail="Character not found")
+    if not db_obj: return None
+    await verify_project_access(db_obj.project_id, current_user, db)
     
     await db.delete(db_obj)
     await db.commit()

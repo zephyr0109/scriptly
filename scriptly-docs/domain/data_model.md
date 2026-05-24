@@ -8,18 +8,21 @@
 ## 2. 주요 엔티티 정의
 
 ### A. User (사용자)
-시스템을 이용하는 작가 정보입니다.
+시스템을 이용하는 작가 정보입니다. 본 시스템의 모든 개인화 데이터는 User에 귀속됩니다.
 - **Attributes**:
-  - `id`: UUID
-  - `email`: 이메일 (로그인 식별자)
-  - `name`: 필명 또는 성명
-  - `created_at`: 가입일
+  - `id`: UUID (Primary Key)
+  - `email`: String (Unique Index, 로그인 식별자)
+  - `hashed_password`: String (암호화된 비밀번호)
+  - `full_name`: String (사용자 실명 또는 필명)
+  - `is_active`: Boolean (계정 활성화 상태, default: True)
+  - `created_at`: DateTime
+  - `updated_at`: DateTime
 
 ### B. Project (프로젝트)
-작가가 집필 중인 하나의 작품 단위입니다.
+작가가 집필 중인 하나의 작품 단위입니다. 특정 User에 귀속됩니다.
 - **Attributes**:
   - `id`: UUID
-  - `owner_id`: ForeignKey (User)
+  - `user_id`: ForeignKey (User.id, 필수)
   - `title`: 작품 제목 (가제)
   - `description`: 작품 전체 개요
   - `created_at`: 생성일

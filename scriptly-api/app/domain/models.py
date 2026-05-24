@@ -8,8 +8,22 @@ import uuid
 from app.infrastructure.database import Base
 from app.domain.schemas import CardStatus, AnalysisStatus
 
+class UserModel(Base):
+    """시스템 사용자 정보"""
+    __tablename__ = "users"
+
+    id = Column(PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    email = Column(String(255), unique=True, nullable=False, index=True)
+    hashed_password = Column(String(255), nullable=False)
+    full_name = Column(String(100), nullable=True)
+    role = Column(String(50), default="USER") # ADMIN, USER
+    is_active = Column(Boolean, default=True)
+    
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
 class ScouterArticleModel(Base):
-    """영감 스카우터(검색/트렌딩)용 임시 저장소"""
+    """영감 스카우터(검색/트렌딩)용 임시 저장소 (공용 또는 사용자 필터링 가능)"""
     __tablename__ = "scouter_articles"
 
     id = Column(PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -33,6 +47,8 @@ class SourceModel(Base):
     __tablename__ = "sources"
 
     id = Column(PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=True) # 기존 데이터 호환을 위해 일단 nullable=True
+    
     type = Column(String(50), nullable=False) # NEWS, FILE, NOTE
     title = Column(String(255), nullable=False)
     summary = Column(Text, nullable=True)
@@ -57,6 +73,8 @@ class ProjectModel(Base):
     __tablename__ = "projects"
 
     id = Column(PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=True) # 기존 데이터 호환을 위해 일단 nullable=True
+    
     title = Column(String(255), nullable=False)
     
     # 1. 기획 메타데이터

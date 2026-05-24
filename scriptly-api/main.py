@@ -21,7 +21,7 @@ from typing import List
 import uvicorn
 from app.application.services.curation_service import CurationService
 from app.domain.schemas import CurationResult, NewsArticle, CharacterPersona
-from app.interface.api.v1 import archive, news, insight, projects, characters, events
+from app.interface.api.v1 import archive, news, insight, projects, characters, events, auth
 
 app = FastAPI(title="Scriptly API")
 
@@ -58,6 +58,7 @@ app.add_middleware(
 )
 
 # 라우터 등록
+app.include_router(auth.router, prefix="/api/v1")
 app.include_router(archive.router, prefix="/api/v1")
 app.include_router(news.router, prefix="/api/v1")
 app.include_router(insight.router, prefix="/api/v1")

@@ -4,7 +4,7 @@
 """
 import logging
 import uuid
-from typing import List
+from typing import List, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from fastapi import HTTPException
@@ -15,11 +15,12 @@ from app.domain.models import InspirationCardModel, SourceModel, ScouterArticleM
 logger = logging.getLogger(__name__)
 
 class ArchivingService:
-    async def create_file_source(self, db_session: AsyncSession, title: str, content: str, file_path: str, original_filename: str) -> SourceModel:
+    async def create_file_source(self, db_session: AsyncSession, title: str, content: str, file_path: str, original_filename: str, user_id: Optional[uuid.UUID] = None) -> SourceModel:
         """업로드된 파일을 보관함 자료로 즉시 저장합니다."""
-        logger.info(f"Executing create_file_source: {title}...")
+        logger.info(f"Executing create_file_source: {title} for user {user_id}...")
         try:
             new_source = SourceModel(
+                user_id=user_id,
                 type="FILE",
                 title=title,
                 summary=title,
@@ -36,11 +37,12 @@ class ArchivingService:
             logger.error(f"Error in create_file_source: {e}", exc_info=True)
             raise
 
-    async def create_url_source(self, db_session: AsyncSession, title: str, content: str, url: str) -> SourceModel:
+    async def create_url_source(self, db_session: AsyncSession, title: str, content: str, url: str, user_id: Optional[uuid.UUID] = None) -> SourceModel:
         """외부 URL 링크를 보관함 자료로 즉시 저장합니다."""
-        logger.info(f"Executing create_url_source: {title}...")
+        logger.info(f"Executing create_url_source: {title} for user {user_id}...")
         try:
             new_source = SourceModel(
+                user_id=user_id,
                 type="NEWS",
                 title=title,
                 summary=title,
@@ -56,9 +58,9 @@ class ArchivingService:
             logger.error(f"Error in create_url_source: {e}", exc_info=True)
             raise
 
-    async def save_scouter_article_to_archive(self, db_session: AsyncSession, scouter_article_id: uuid.UUID) -> SourceModel:
+    async def save_scouter_article_to_archive(self, db_session: AsyncSession, scouter_article_id: uuid.UUID, user_id: Optional[uuid.UUID] = None) -> SourceModel:
         """스카우터의 데이터를 보관함으로 승격시킵니다."""
-        logger.info(f"Executing save_scouter_article_to_archive: {scouter_article_id}...")
+        logger.info(f"Executing save_scouter_article_to_archive: {scouter_article_id} for user {user_id}...")
         try:
             stmt = select(ScouterArticleModel).where(ScouterArticleModel.id == scouter_article_id)
             result = await db_session.execute(stmt)
@@ -68,6 +70,7 @@ class ArchivingService:
                 raise HTTPException(status_code=404, detail="스카우터 데이터를 찾을 수 없습니다.")
                 
             new_source = SourceModel(
+                user_id=user_id,
                 type="NEWS",
                 title=article.title,
                 summary=article.summary,
@@ -75,7 +78,7 @@ class ArchivingService:
                 source_url=article.source_url,
                 tension_score=article.tension_score,
                 tension_reason=article.tension_reason,
-                analysis_status=article.analysis_status, # 스카우터 분석 상태 유지
+                analysis_status=article.analysis_status,
                 source_metadata=article.source_metadata
             )
             
@@ -110,7 +113,7 @@ class ArchivingService:
             raise
 
     async def get_sources(self, db_session: AsyncSession) -> List[SourceModel]:
-        """보관함의 모든 소스를 가져옵니다."""
+        """보관함의 모든 소스를 가져옵니다. (필터링은 인터페이스 계층에서 처리 권장)"""
         logger.info("Executing get_sources...")
         try:
             stmt = select(SourceModel).order_by(SourceModel.ingested_at.desc())

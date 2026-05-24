@@ -49,13 +49,13 @@ services:
       context: ./scriptly-web
       dockerfile: Dockerfile
       args:
-        - NEXT_PUBLIC_API_URL=http://zephyr0109.duckdns.org:8100
+        - NEXT_PUBLIC_API_URL=http://zephyr0109.duckdns.org:8100/api/v1
     container_name: scriptly-web
     restart: always
     ports:
       - "3100:3000"
     environment:
-      - NEXT_PUBLIC_API_URL=http://zephyr0109.duckdns.org:8100
+      - NEXT_PUBLIC_API_URL=http://zephyr0109.duckdns.org:8100/api/v1
     depends_on:
       - api
 

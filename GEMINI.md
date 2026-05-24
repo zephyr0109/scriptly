@@ -6,28 +6,24 @@
 - **대상**: 전문/지망 드라마 작가 (비기술자 중심).
 - **핵심 가치**: 사실적 뉴스를 드라마틱한 갈등 자산으로 변환.
 
-## 🛠 기술 스택
+## 🛠 기술 스택 및 전용 스킬
 
-- **프론트엔드**: Next.js 15+ (App Router)
-- **백엔드**: FastAPI (Python 3.12+)
-- **패키지 관리**: **uv** (Python 전용)
-- **인프라**: PostgreSQL 16, Redis
+- **프론트엔드**: Next.js 15+ (App Router) -> `tailwind-v4-master`, `react-hook-auditor` 스킬 활용
+- **백엔드**: FastAPI (Python 3.12+) -> `uv-package-manager`, `db-migration-helper` 스킬 활용
+- **공통/도메인**: `drama-structure-analyzer`, `prompt-eval-tester` 스킬 활용
 
 ## 📂 디렉토리 가이드라인
 
-- `scriptly-web/`: Next.js 프론트엔드 및 BFF. (별도 `GEMINI.md` 설정 참조)
-- `scriptly-api/`: FastAPI 백엔드 및 AI 에이전트 로직. (별도 `GEMINI.md` 설정 참조)
+- `scriptly-web/`: Next.js 프론트엔드 및 BFF. (UI/UX 관련 스킬 집중 활용)
+- `scriptly-api/`: FastAPI 백엔드 및 AI 에이전트 로직. (인프라/데이터 관련 스킬 집중 활용)
 
 ## 📜 공통 코딩 규칙
 
-- **사실 관계 확인**: 모든 AI 요약은 `source_url`과 `published_at`을 포함해야 함.
+- **사실 관계 확인**: 모든 AI 요약은 `source_url`과 `published_at`을 포함해야 함. (`ai-output-validator` 활용)
 - **비동기 우선**: 모든 I/O 작업(API, DB)에 `async/await` 사용.
-- **언어 설정**: UI와 주석 등은 기본적으로 **한글**을 사용하며, 기술 용어는 영어 혼용 가능.
-- **환경**: 모든 서비스는 컨테이너 환경에서 동작 가능해야 함.
-- **Preserve Existing Code**: 새로운 기능을 추가할 때, 기존에 잘 작동하는 로직이나 변수 명을 동의 없이 수정하거나 삭제하지 말 것.
-- **Incremental Changes Only**: 한 번의 요청에는 요청받은 기능만 구현하며, 범위 밖의 리팩토링은 절대 금지함.
-- **Idempotency**: 동일한 기능을 여러 번 구현해도 시스템의 안정성이 유지되어야 하며, 중복된 로직이 생기지 않도록 기존 코드를 먼저 분석할 것.
-- **No Omissions**: 코드를 생략(e.g. `// ... existing code ...`)하지 말고, 전체 컨텍스트가 유지된 완성된 코드를 제시할 것.
-- **임의 판단 금지**: 지시한 명령 외의 다른 작업은 절대 하지 말 것. 예를들어 메뉴명을 임의로 바꾼다던지 등
-- **주석 작성**: 컴포넌트 신규생성, 메소드 및 함수 단위 소스 작성 시 해당 소스에 대한 간략한 설명을 주석으로 추가합니다.
-- **코드 분할**: 한 소스파일이 300라인이 넘어가면 소스 리팩토링, 클래스 및 모듈 분리를 검토합니다. 반드시 수행하는것은 아니고 역할에 따른 분리를 충실히 하면 됩니다.
+- **언어 설정**: UI와 주석 등은 기본적으로 **한글**을 사용. (`korean-a11y-checker` 활용)
+- **도메인 품질**: 극작 보조 도구로서의 품질 유지를 위해 `drama-structure-analyzer` 및 `prompt-eval-tester` 스킬을 상시 적용함.
+- **기본 원칙**:
+  - 기존 코드 보존 (Preserve Existing Code) 및 기능 단위 점진적 수정 (Incremental Changes).
+  - 전체 컨텍스트 유지 (No Omissions) 및 임의 판단 금지.
+  - 클래스/함수 단위 주석 필수 작성 및 소스 분할 검토 (300라인 기준).

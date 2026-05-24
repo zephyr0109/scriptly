@@ -1,9 +1,11 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { 
   Sparkles, Brain, Archive, PenTool, Search, 
-  Sun, Moon, X, CheckCircle, AlertCircle, Info as InfoIcon
+  Sun, Moon, X, CheckCircle, AlertCircle, Info as InfoIcon,
+  LogOut, User
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -18,13 +20,23 @@ import InsightLabMain from "@/components/features/insight/InsightLabMain";
 import { useCuration } from "@/hooks/useCuration";
 import { useArchive } from "@/hooks/useArchive";
 import { useInsightLab } from "@/hooks/useInsightLab";
+import { useAuthStore } from "@/hooks/useAuth";
 
 export default function IntegratedPrototype() {
+  const router = useRouter();
+  const { user, isAuthenticated, logout } = useAuthStore();
   const [activeTab, setActiveTab] = useState("curation");
   const [isDarkMode, setIsDarkMode] = useState(true);
   const [sidebarWidth, setSidebarWidth] = useState(240);
   const [isResizingSidebar, setIsResizingSidebar] = useState(false);
   
+  // 0. 인증 가드
+  useEffect(() => {
+    if (!isAuthenticated) {
+      router.push('/login');
+    }
+  }, [isAuthenticated, router]);
+
   // Toast State
   const [toasts, setToasts] = useState<any[]>([]);
 
@@ -117,6 +129,9 @@ export default function IntegratedPrototype() {
     return () => { window.removeEventListener("mousemove", handleMouseMove); window.removeEventListener("mouseup", handleMouseUp); };
   }, [isResizingSidebar]);
 
+  // 인증되지 않은 경우 렌더링 방지 (깜빡임 방지)
+  if (!isAuthenticated) return null;
+
   return (
     <div className={cn("flex h-screen overflow-hidden transition-all duration-500 font-sans antialiased", isDarkMode ? "dark bg-[#0A0A0A] text-zinc-200" : "light bg-white text-zinc-900")}>
       <aside style={{ width: `${sidebarWidth}px` }} className={cn("relative flex flex-col border-r p-8 gap-12 z-40 shadow-2xl", isDarkMode ? "border-zinc-800/50 bg-[#0A0A0A]" : "border-zinc-200 bg-white")}>
@@ -124,7 +139,7 @@ export default function IntegratedPrototype() {
           <div className="w-12 h-12 bg-amber-500 rounded-[1.25rem] flex items-center justify-center shadow-xl shadow-amber-500/20"><PenTool size={24} className="text-black" /></div>
           <span className={cn("text-2xl font-black tracking-tighter italic", isDarkMode ? "text-white" : "text-zinc-900")}>Scriptly.</span>
         </div>
-        <nav className="flex flex-col gap-2">
+        <nav className="flex flex-col gap-2 flex-1">
           {[
             { id: "curation", icon: Sparkles, label: "영감 스카우터" },
             { id: "archive", icon: Archive, label: "영감 보관함" },
@@ -135,6 +150,26 @@ export default function IntegratedPrototype() {
             </div>
           ))}
         </nav>
+
+        {/* User Profile & Logout */}
+        <div className={cn("mt-auto pt-6 border-t flex flex-col gap-4", isDarkMode ? "border-zinc-800" : "border-zinc-100")}>
+          <div className="flex items-center gap-3 px-2">
+            <div className="w-10 h-10 rounded-full bg-zinc-800 flex items-center justify-center border border-zinc-700">
+              <User size={20} className="text-zinc-400" />
+            </div>
+            <div className="flex flex-col min-w-0">
+              <span className="text-sm font-bold truncate">{user?.full_name || '작가님'}</span>
+              <span className="text-[10px] text-zinc-500 truncate">{user?.email}</span>
+            </div>
+          </div>
+          <button 
+            onClick={() => { logout(); router.push('/login'); }}
+            className="flex items-center gap-3 px-6 py-3 rounded-xl hover:bg-rose-500/10 text-zinc-500 hover:text-rose-500 transition-all text-xs font-bold"
+          >
+            <LogOut size={16} /> <span>로그아웃</span>
+          </button>
+        </div>
+
         <div onMouseDown={() => setIsResizingSidebar(true)} className="absolute top-0 right-0 w-1.5 h-full cursor-col-resize hover:bg-amber-500 transition-all z-50" />
       </aside>
 

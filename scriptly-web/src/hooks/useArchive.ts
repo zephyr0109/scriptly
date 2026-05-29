@@ -4,8 +4,10 @@
  */
 import { useState, useEffect, useCallback } from "react";
 import api from "@/lib/api";
+import { useAuthStore } from "@/hooks/useAuth";
 
 export function useArchive() {
+  const { isAuthenticated } = useAuthStore();
   const [archiveItems, setArchiveItems] = useState<any[]>([]);
   const [selectedArchiveIndex, setSelectedArchiveIndex] = useState<number | null>(null);
   const [selectedSourceIds, setSelectedSourceIds] = useState<string[]>([]);
@@ -23,11 +25,13 @@ export function useArchive() {
   }, [selectedArchiveIndex]);
 
   useEffect(() => {
+    if (!isAuthenticated) return;
     fetchArchiveItems();
-  }, [fetchArchiveItems]);
+  }, [fetchArchiveItems, isAuthenticated]);
 
   // 보관함 분석 상태 폴링
   useEffect(() => {
+    if (!isAuthenticated) return;
     const hasPendingItems = archiveItems.some(item => item.analysis_status === "PENDING" || item.analysis_status === "PROCESSING");
     if (!hasPendingItems) return;
     const intervalId = setInterval(() => { fetchArchiveItems(); }, 5000);
@@ -88,6 +92,19 @@ export function useArchive() {
     }
   };
 
+  const handleCreateNote = async (title: string, content: string, onSuccess?: () => void, onFailure?: (msg: string) => void) => {
+    setIsUploading(true);
+    try {
+      await api.post('/archive/note', { title, content });
+      if (onSuccess) onSuccess();
+      fetchArchiveItems();
+    } catch (e: any) { 
+      if (onFailure) onFailure(e.response?.data?.detail || "메모 저장 실패");
+    } finally { 
+      setIsUploading(false); 
+    }
+  };
+
   const handleDeleteArchiveItem = async (id: string, onSuccess?: () => void) => {
     try {
       await api.delete(`/archive/source/${id}`);
@@ -108,6 +125,7 @@ export function useArchive() {
     fetchArchiveItems,
     handleFileUpload,
     handleUrlArchive,
+    handleCreateNote,
     handleDownloadFile,
     handleReanalyze,
     handleDeleteArchiveItem,

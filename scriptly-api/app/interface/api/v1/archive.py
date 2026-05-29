@@ -21,6 +21,12 @@ from app.application.services.file_service import FileService
 from app.application.services.ai_service import AIService
 from app.application.services.auth_service import AuthService
 
+from pydantic import BaseModel
+
+class NoteCreateRequest(BaseModel):
+    title: str
+    content: str
+
 router = APIRouter(prefix="/archive", tags=["Archive"])
 logger = logging.getLogger(__name__)
 
@@ -79,6 +85,24 @@ async def process_source_analysis(source_id: uuid.UUID):
             await db.commit()
 
 # --- API 엔드포인트 ---
+
+@router.post("/note", response_model=Source, status_code=status.HTTP_201_CREATED)
+async def create_note_source(
+    background_tasks: BackgroundTasks,
+    request: NoteCreateRequest,
+    current_user: UserModel = Depends(AuthService.get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """직접 작성한 극작 메모를 보관함에 저장합니다."""
+    logger.info(f"API Request: create_note_source from user: {current_user.id}")
+    source = await archiving_service.create_note_source(
+        db_session=db,
+        title=request.title,
+        content=request.content,
+        user_id=current_user.id
+    )
+    background_tasks.add_task(process_source_analysis, source.id)
+    return Source.model_validate(source)
 
 @router.post("/upload", response_model=Source, status_code=status.HTTP_201_CREATED)
 async def upload_file(

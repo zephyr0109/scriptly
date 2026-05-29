@@ -16,7 +16,7 @@ interface InsightLabMainProps {
   selectProject: (p: any) => void;
   onUpdateProject: (id: string, data: any) => Promise<any>;
   isDarkMode: boolean;
-  addToast: (msg: string, type: 'success' | 'error' | 'info') => void;
+  addToast: (msg: string, type?: 'success' | 'error' | 'info' | 'warning') => void;
   
   // flow props
   nodes: any[];

@@ -37,6 +37,26 @@ class ArchivingService:
             logger.error(f"Error in create_file_source: {e}", exc_info=True)
             raise
 
+    async def create_note_source(self, db_session: AsyncSession, title: str, content: str, user_id: Optional[uuid.UUID] = None) -> SourceModel:
+        """직접 작성한 극작 메모를 보관함 자료로 즉시 저장합니다."""
+        logger.info(f"Executing create_note_source: {title} for user {user_id}...")
+        try:
+            new_source = SourceModel(
+                user_id=user_id,
+                type="NOTE",
+                title=title,
+                summary=title[:100] if title else "메모 요약",
+                content=content,
+                analysis_status=AnalysisStatus.PENDING.value
+            )
+            db_session.add(new_source)
+            await db_session.commit()
+            await db_session.refresh(new_source)
+            return new_source
+        except Exception as e:
+            logger.error(f"Error in create_note_source: {e}", exc_info=True)
+            raise
+
     async def create_url_source(self, db_session: AsyncSession, title: str, content: str, url: str, user_id: Optional[uuid.UUID] = None) -> SourceModel:
         """외부 URL 링크를 보관함 자료로 즉시 저장합니다."""
         logger.info(f"Executing create_url_source: {title} for user {user_id}...")

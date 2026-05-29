@@ -4,8 +4,10 @@
  */
 import { useState, useEffect } from "react";
 import api from "@/lib/api";
+import { useAuthStore } from "@/hooks/useAuth";
 
 export function useCuration(fetchArchiveItems: () => void) {
+  const { isAuthenticated } = useAuthStore();
   const [searchQuery, setSearchQuery] = useState("");
   const [newsResults, setNewsResults] = useState<any[]>([]);
   const [selectedNewsIndex, setSelectedNewsIndex] = useState<number | null>(null);
@@ -17,6 +19,7 @@ export function useCuration(fetchArchiveItems: () => void) {
 
   // 트렌딩 뉴스 최초 로드
   useEffect(() => {
+    if (!isAuthenticated) return;
     const fetchTrendingNews = async () => {
       setIsLoading(true);
       try {
@@ -31,10 +34,11 @@ export function useCuration(fetchArchiveItems: () => void) {
       }
     };
     fetchTrendingNews();
-  }, []);
+  }, [isAuthenticated]);
 
   // 스카우터 상태 폴링 로직
   useEffect(() => {
+    if (!isAuthenticated) return;
     const pendingItems = newsResults.filter(r => r.analysis_status === "PENDING" || r.analysis_status === "PROCESSING");
     if (pendingItems.length === 0) return;
     const intervalId = setInterval(async () => {

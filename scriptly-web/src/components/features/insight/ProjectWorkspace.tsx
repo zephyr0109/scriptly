@@ -29,7 +29,7 @@ interface ProjectWorkspaceProps {
   onRemoveSource: (id: string) => void;
   onUpdateProject: (id: string, data: any) => Promise<any>;
   handleSaveLabSession: () => Promise<boolean>;
-  addToast: (msg: string, type: 'success' | 'error' | 'info') => void;
+  addToast: (msg: string, type?: 'success' | 'error' | 'info' | 'warning') => void;
   // Character props
   characters: any[];
   syncCharacters: (id: string, sourceIds: string[]) => void;

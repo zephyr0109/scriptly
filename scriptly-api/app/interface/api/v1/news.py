@@ -163,8 +163,8 @@ async def trigger_analysis(
         articles_response.append({
             "id": str(a.id),
             "article": {
-                "title": item.get("title", ""),
-                "description": item.get("description", ""),
+                "title": _clean(item.get("title", "")),
+                "description": _clean(item.get("description", "")),
                 "link": item.get("link", ""),
                 "pubDate": item.get("pubDate", "")
             },

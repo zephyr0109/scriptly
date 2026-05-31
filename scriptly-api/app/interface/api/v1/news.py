@@ -22,6 +22,11 @@ from app.application.services.auth_service import AuthService
 
 logger = logging.getLogger(__name__)
 
+import html, re
+def _clean(text: str) -> str:
+    if not text: return ""
+    return html.unescape(re.sub(r'<[^>]*>', '', text))
+
 router = APIRouter(prefix="/news", tags=["News Analysis"])
 
 @router.get("/trending")
@@ -42,10 +47,12 @@ async def get_trending_news(
     articles = []
     for entry in feed.entries[:10]:
         try:
+            summary_raw = entry.summary if hasattr(entry, 'summary') else entry.title
+            summary_clean = _clean(summary_raw)[:500]
             article = ScouterArticleModel(
-                title=entry.title,
-                summary=(entry.summary if hasattr(entry, 'summary') else entry.title)[:500],
-                content=entry.summary if hasattr(entry, 'summary') else "",
+                title=_clean(entry.title),
+                summary=summary_clean,
+                content=summary_clean,
                 source_url=entry.link,
                 analysis_status=AnalysisStatus.PENDING.value,
                 source_metadata={"original_pubDate": entry.published if hasattr(entry, 'published') else ""}
@@ -135,11 +142,6 @@ async def trigger_analysis(
         raise HTTPException(status_code=500, detail="Naver Search Failed")
 
     if not raw_news: return []
-
-    import html, re
-    def _clean(text: str) -> str:
-        if not text: return ""
-        return html.unescape(re.sub(r'<[^>]*>', '', text))
 
     new_articles = []
     for item in raw_news:

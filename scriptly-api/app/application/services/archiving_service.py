@@ -99,7 +99,7 @@ class ArchivingService:
                 tension_score=article.tension_score,
                 tension_reason=article.tension_reason,
                 analysis_status=article.analysis_status,
-                source_metadata=article.source_metadata
+                source_metadata=article.source_metadata or {}
             )
             
             db_session.add(new_source)

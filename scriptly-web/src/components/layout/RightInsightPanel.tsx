@@ -265,8 +265,7 @@ export default function RightInsightPanel({
 
               {/* 하단 극작 자산화 제어 버튼 섹션 */}
               <div className="flex flex-col gap-3 border-t border-zinc-800/30 pt-4 shrink-0 mt-auto bg-[#09090C] z-10 sticky bottom-0">
-                <span className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">드라마 갈등 자산화 제어</span>
-                
+                                
                 <div className="flex gap-2">
                   {analyzedProjects[currentInspiration.id] ? (
                     <button 

@@ -208,6 +208,54 @@ export default function IntegratedPrototype() {
   // 프로젝트 참고 책장에 연결할 리스트 상태 (시뮬레이션)
   const [projectLinkedInspirations, setProjectLinkedInspirations] = useState<string[]>([]);
 
+  // 최근 검색어 (쿠키 기반 최근 5개 유지, 초기값 추천 태그 탑재)
+  const [recentQueries, setRecentQueries] = useState<string[]>(["비자금", "납치", "딥페이크", "로비"]);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      // 쿠키 로드 헬퍼
+      const getCookie = (name: string): string | null => {
+        const nameEQ = name + "=";
+        const ca = document.cookie.split(';');
+        for (let i = 0; i < ca.length; i++) {
+          let c = ca[i];
+          while (c.charAt(0) === ' ') c = c.substring(1, c.length);
+          if (c.indexOf(nameEQ) === 0) return decodeURIComponent(c.substring(nameEQ.length, c.length));
+        }
+        return null;
+      };
+
+      const saved = getCookie("scriptly-recent-searches");
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setRecentQueries(parsed);
+          }
+        } catch (e) {}
+      }
+    }
+  }, []);
+
+  const addToRecentQueries = useCallback((query: string) => {
+    if (!query.trim()) return;
+    setRecentQueries(prev => {
+      const filteredPrev = prev.filter(q => q !== query);
+      const next = [query, ...filteredPrev].slice(0, 5);
+
+      // 쿠키 저장 헬퍼
+      const setCookie = (name: string, value: string, days = 30) => {
+        const date = new Date();
+        date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
+        const expires = "; expires=" + date.toUTCString();
+        document.cookie = name + "=" + encodeURIComponent(value) + expires + "; path=/; SameSite=Lax";
+      };
+
+      setCookie("scriptly-recent-searches", JSON.stringify(next));
+      return next;
+    });
+  }, []);
+
   // 보관함 필터 및 정렬용 Local State
   const [archiveFilter, setArchiveFilter] = useState<string>("all");
   const [archiveSort, setArchiveSort] = useState<string>("date");
@@ -344,43 +392,69 @@ export default function IntegratedPrototype() {
     // A. 실시간 검색 뉴스 매핑
     newsResults.forEach(item => {
       if (item.detail_analysis) {
-        const da = item.detail_analysis;
-        map[item.id] = {
-          score: da.tension_score || 0,
-          scoreDesc: da.tension_reason || "실시간 분석 완료",
-          conflictStructure: da.potential_conflict || da.conflict_structure || "대립 갈등 구도 분석 완료",
-          summaryAndVibe: da.summary_and_vibe || da.tension_reason || "줄거리 분석 완료",
-          recommendedVibe: da.recommended_vibe || "리얼리즘 수사/법정 드라마",
-          keywords: da.keywords || [],
-          relatedPeople: (da.related_people || []).map((p: any) => ({
-            role: p.role || "미상",
-            desc: p.desc || p.description || "정보 분석",
-            desire: p.desire || "욕망"
-          })),
-          keyEvents: da.key_events || []
-        };
+        let da = item.detail_analysis;
+        if (typeof da === "string") {
+          try {
+            da = JSON.parse(da);
+          } catch (e) {
+            console.error("Failed to parse detail_analysis:", e);
+            return;
+          }
+        }
+
+        if (da) {
+          const peopleSource = da.people || da.related_people || da.characters || [];
+          const keyEventsSource = da.incidents || da.key_events || da.events || [];
+          map[item.id] = {
+            score: da.tension_score || 0,
+            scoreDesc: da.tension_reason || "실시간 분석 완료",
+            conflictStructure: da.core_conflict || da.potential_conflict || da.conflict_structure || "대립 갈등 구도 분석 완료",
+            summaryAndVibe: da.summary || da.summary_and_vibe || da.tension_reason || "줄거리 분석 완료",
+            recommendedVibe: da.atmosphere || da.recommended_vibe || "리얼리즘 수사/법정 드라마",
+            keywords: da.keywords || [],
+            relatedPeople: Array.isArray(peopleSource) ? peopleSource.map((p: any) => ({
+              role: p.role || p.name || "미상",
+              desc: p.description || p.desc || "정보 분석",
+              desire: p.desire || p.internal_desire || p.description || p.desc || "욕망"
+            })) : [],
+            keyEvents: Array.isArray(keyEventsSource) ? keyEventsSource : []
+          };
+        }
       }
     });
 
     // B. 보관함 소스 매핑 (type: NEWS, FILE, NOTE 대응)
     archiveItems.forEach(item => {
       const meta = item.source_metadata || {};
-      const da = meta.detailed_analysis || item.detailed_analysis;
+      let da = meta.detailed_analysis || item.detailed_analysis;
       if (da) {
-        map[item.id] = {
-          score: da.tension_score || item.tension_score || 0,
-          scoreDesc: da.tension_reason || item.tension_reason || "보관 데이터 분석 완료",
-          conflictStructure: da.potential_conflict || da.conflict_structure || "수집된 갈등 역학 구조",
-          summaryAndVibe: da.summary_and_vibe || da.tension_reason || "상세 내러티브 요약",
-          recommendedVibe: da.recommended_vibe || "서스펜스 사회 스릴러",
-          keywords: da.keywords || [],
-          relatedPeople: (da.related_people || []).map((p: any) => ({
-            role: p.role || "미상",
-            desc: p.desc || p.description || "정보 프로필",
-            desire: p.desire || "내면적 욕망"
-          })),
-          keyEvents: da.key_events || []
-        };
+        if (typeof da === "string") {
+          try {
+            da = JSON.parse(da);
+          } catch (e) {
+            console.error("Failed to parse detailed_analysis from archive:", e);
+            return;
+          }
+        }
+
+        if (da) {
+          const peopleSource = da.people || da.related_people || da.characters || [];
+          const keyEventsSource = da.incidents || da.key_events || da.events || [];
+          map[item.id] = {
+            score: da.tension_score || item.tension_score || 0,
+            scoreDesc: da.tension_reason || item.tension_reason || "보관 데이터 분석 완료",
+            conflictStructure: da.core_conflict || da.potential_conflict || da.conflict_structure || "수집된 갈등 역학 구조",
+            summaryAndVibe: da.summary || da.summary_and_vibe || da.tension_reason || "상세 내러티브 요약",
+            recommendedVibe: da.atmosphere || da.recommended_vibe || "서스펜스 사회 스릴러",
+            keywords: da.keywords || [],
+            relatedPeople: Array.isArray(peopleSource) ? peopleSource.map((p: any) => ({
+              role: p.role || p.name || "미상",
+              desc: p.description || p.desc || "정보 프로필",
+              desire: p.desire || p.internal_desire || p.description || p.desc || "내면적 욕망"
+            })) : [],
+            keyEvents: Array.isArray(keyEventsSource) ? keyEventsSource : []
+          };
+        }
       }
     });
 
@@ -603,7 +677,13 @@ export default function IntegratedPrototype() {
                 <>
                   <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest px-1">검색 설정</span>
                   <div className="flex flex-col gap-3">
-                    <form onSubmit={(e) => { e.preventDefault(); handleSearch(searchQuery, 1); }} className={cn(
+                    <form onSubmit={(e) => { 
+                      e.preventDefault(); 
+                      if (searchQuery.trim()) {
+                        handleSearch(searchQuery, 1); 
+                        addToRecentQueries(searchQuery);
+                      }
+                    }} className={cn(
                       "flex items-center gap-2.5 px-3 py-2.5 rounded-xl border transition-all",
                       isDarkMode ? "bg-zinc-900/50 border-zinc-800 focus-within:border-amber-500/50" : "bg-white border-zinc-200 focus-within:border-amber-500"
                     )}>
@@ -616,17 +696,25 @@ export default function IntegratedPrototype() {
                       />
                     </form>
                     <div className="flex flex-col gap-1.5">
-                      <span className="text-[9px] text-zinc-500 font-bold">인기 검색 태그</span>
+                      <span className="text-[9px] text-zinc-500 font-bold">최근 검색어</span>
                       <div className="flex flex-wrap gap-1.5">
-                        {["비자금", "납치", "딥페이크", "로비"].map(tag => (
-                          <span 
-                            key={tag} 
-                            onClick={() => { setSearchQuery(tag); handleSearch(tag, 1); }}
-                            className="text-[9px] bg-zinc-800 text-zinc-400 hover:text-amber-400 hover:bg-zinc-700/50 px-2 py-1 rounded-md cursor-pointer transition-all"
-                          >
-                            #{tag}
-                          </span>
-                        ))}
+                        {recentQueries.length > 0 ? (
+                          recentQueries.map(tag => (
+                            <span 
+                              key={tag} 
+                              onClick={() => { 
+                                setSearchQuery(tag); 
+                                handleSearch(tag, 1); 
+                                addToRecentQueries(tag);
+                              }}
+                              className="text-[9px] bg-zinc-800 text-zinc-400 hover:text-amber-400 hover:bg-zinc-700/50 px-2.5 py-1 rounded-md cursor-pointer transition-all"
+                            >
+                              {tag}
+                            </span>
+                          ))
+                        ) : (
+                          <span className="text-[9px] text-zinc-650 font-bold italic px-1">최근 검색어가 없습니다.</span>
+                        )}
                       </div>
                     </div>
                   </div>

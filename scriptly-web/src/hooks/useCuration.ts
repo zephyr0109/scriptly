@@ -56,7 +56,7 @@ export function useCuration(fetchArchiveItems: () => void) {
               nextResults[idx] = {
                 ...nextResults[idx],
                 analysis_status: statusData.analysis_status,
-                detail_analysis: statusData.detail_analysis,
+                detail_analysis: nextResults[idx].detail_analysis || statusData.detail_analysis,
                 tension_evaluation: {
                   score: statusData.tension_score || 0,
                   reason: statusData.tension_reason || "분석 완료",

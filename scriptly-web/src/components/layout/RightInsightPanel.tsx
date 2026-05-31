@@ -129,7 +129,7 @@ export default function RightInsightPanel({
                     isDarkMode ? "bg-[#14141E] border-zinc-800" : "bg-white border-zinc-200"
                   )}>
                     <div className="w-8 h-8 border-3 border-amber-500 border-t-transparent rounded-full animate-spin" />
-                    <span className="text-xs font-bold text-amber-400 animate-pulse">드라마 갈등 가치 정밀 추출 중...</span>
+                    <span className="text-xs font-bold text-amber-400 animate-pulse">AI 분석 중</span>
                   </div>
                 )}
 
@@ -269,11 +269,12 @@ export default function RightInsightPanel({
                 <div className="flex gap-2">
                   {analyzedProjects[currentInspiration.id] ? (
                     <button 
-                      disabled
-                      className="flex-1 py-2.5 bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-[11px] font-bold rounded-lg flex items-center justify-center gap-1.5 opacity-80"
+                      onClick={() => handleTriggerQuickAnalysis(currentInspiration.id, inspirationSubTab === "archive")}
+                      disabled={isAnalyzingQuick}
+                      className="flex-1 py-2.5 bg-zinc-800 hover:bg-zinc-700 text-amber-400 border border-zinc-700/60 text-[11px] font-black rounded-lg transition-all text-center flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer"
                     >
-                      <Check size={12} />
-                      <span>분석 완료</span>
+                      <Sparkles size={12} className={cn(isAnalyzingQuick && "animate-spin")} />
+                      <span>{isAnalyzingQuick ? "재분석 진행 중..." : "AI 재분석 요청"}</span>
                     </button>
                   ) : (
                     <button 
@@ -281,8 +282,8 @@ export default function RightInsightPanel({
                       disabled={isAnalyzingQuick}
                       className="flex-1 py-2.5 bg-zinc-800 hover:bg-zinc-700 text-amber-400 border border-zinc-700/60 text-[11px] font-black rounded-lg transition-all text-center flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer"
                     >
-                      <Sparkles size={12} />
-                      <span>AI 분석 요청</span>
+                      <Sparkles size={12} className={cn(isAnalyzingQuick && "animate-spin")} />
+                      <span>{isAnalyzingQuick ? "분석 진행 중..." : "AI 분석 요청"}</span>
                     </button>
                   )}
                   
@@ -291,7 +292,7 @@ export default function RightInsightPanel({
                       <button 
                         onClick={() => {
                           setProjectLinkedInspirations(prev => prev.filter(id => id !== currentInspiration.id));
-                          addToast("프로젝트 연동을 해제했습니다.", "info");
+                          addToast("프로젝트 연동을 해제했습니다. (프리뷰 프로토타입)", "info");
                         }}
                         className="flex-1 py-2.5 bg-amber-500 text-black text-[11px] font-black rounded-lg transition-all text-center flex items-center justify-center gap-1.5 shadow-sm active:scale-95 cursor-pointer"
                       >
@@ -302,7 +303,7 @@ export default function RightInsightPanel({
                       <button 
                         onClick={() => {
                           setProjectLinkedInspirations(prev => [...prev, currentInspiration.id]);
-                          addToast("프로젝트에 참고 영감으로 연결했습니다!", "success");
+                          addToast("프로젝트에 참고 영감으로 연결했습니다! (프리뷰 프로토타입)", "success");
                         }}
                         className="flex-1 py-2.5 bg-zinc-800 border border-zinc-700 text-zinc-300 hover:bg-zinc-700 text-[11px] font-bold rounded-lg transition-all text-center flex items-center justify-center gap-1.5 shadow-sm active:scale-95 cursor-pointer"
                       >

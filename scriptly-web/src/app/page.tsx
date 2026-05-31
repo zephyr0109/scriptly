@@ -949,7 +949,7 @@ export default function IntegratedPrototype() {
                       desc: item.article?.description || item.content || "기사 요약 내용",
                       keyword: item.article?.keyword || item.main_keyword || "시사속보",
                       source: item.article?.source || "네이버 뉴스",
-                      date: item.article?.pubDate ? item.article.pubDate.split(" ")[0] : ""
+                      date: item.article?.pubDate || ""
                     }))} 
                     // 기사 클릭 시 custom hooks의 index 및 ID 상태 동기화 처리 (AI 분석 작동 완벽 대응)
                     selectInspiration={(id) => {

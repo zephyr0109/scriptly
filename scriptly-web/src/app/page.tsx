@@ -819,7 +819,7 @@ export default function IntegratedPrototype() {
             </div>
 
             {/* 프로젝트 세부 집필/기획 하위 메뉴 트리 */}
-            <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-4">
+            <div className="flex-1 overflow-y-auto custom-scrollbar-dark p-4 flex flex-col gap-4">
               <div className="flex flex-col gap-1">
                 <span className="text-[10px] font-black text-zinc-500 uppercase tracking-widest px-2 mb-2 block">드라마 기획 & 집필 도구</span>
                 
@@ -948,7 +948,7 @@ export default function IntegratedPrototype() {
                       title: item.article?.title || item.title || "기사 제목",
                       desc: item.article?.description || item.content || "기사 요약 내용",
                       keyword: item.article?.keyword || item.main_keyword || "시사속보",
-                      source: item.article?.source || "네이버 뉴스",
+                      source: item.article?.link?.includes("google.com") ? "구글 뉴스" : "네이버 뉴스",
                       date: item.article?.pubDate || ""
                     }))} 
                     // 기사 클릭 시 custom hooks의 index 및 ID 상태 동기화 처리 (AI 분석 작동 완벽 대응)
@@ -993,7 +993,7 @@ export default function IntegratedPrototype() {
             <div className="flex-1 flex overflow-hidden animate-in fade-in duration-300">
               
               {activeWorkspaceTab === "info" && (
-                <div className="flex-grow overflow-y-auto p-8 flex flex-col gap-6">
+                <div className="flex-grow overflow-y-auto custom-scrollbar-dark p-8 flex flex-col gap-6">
                   <div className="max-w-2xl flex flex-col gap-5">
                     <h2 className="text-xl font-black">드라마 기획안 정보</h2>
                     
@@ -1079,7 +1079,7 @@ export default function IntegratedPrototype() {
               )}
 
               {activeWorkspaceTab === "draft" && (
-                <div className="flex-grow overflow-y-auto p-8 flex flex-col gap-6">
+                <div className="flex-grow overflow-y-auto custom-scrollbar-dark p-8 flex flex-col gap-6">
                   <div className="flex items-center justify-between shrink-0">
                     <div className="flex flex-col gap-1">
                       <h2 className="text-xl font-black">AI 시놉시스 & 트리트먼트 설계실</h2>
@@ -1112,7 +1112,7 @@ export default function IntegratedPrototype() {
                       <div className="flex items-center justify-between border-b border-zinc-800/20 pb-3">
                         <span className="text-xs font-black text-amber-500">생성 완료된 기획안 시놉시스 뼈대</span>
                       </div>
-                      <div className="flex-1 text-xs leading-relaxed font-semibold text-zinc-400 flex flex-col gap-4 overflow-y-auto max-h-[350px] p-2">
+                      <div className="flex-1 text-xs leading-relaxed font-semibold text-zinc-400 flex flex-col gap-4 overflow-y-auto custom-scrollbar-dark max-h-[350px] p-2">
                         <p className="font-extrabold text-sm text-white">제1화: 소리 없는 목소리 (시놉시스)</p>
                         <p>검경 협조 아래 비밀 USB의 단서를 포렌식하던 황시목 검사는 우연히 거대 비자금 리스트 장부의 핵심을 습득하게 된다. 법과 세력의 칼날 위에 선 그와 한여진 경감은 서로 대립하는 것 같으면서도 거대한 어둠의 로비 권력을 파헤치기 위해 조용히 공조 관계를 맺는다. 갈등이 깊어갈수록, 사법부 핵심 요직의 인과적 비밀이 얽혀들며 파란을 예고한다...</p>
                       </div>

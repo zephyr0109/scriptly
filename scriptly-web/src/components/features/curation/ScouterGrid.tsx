@@ -19,7 +19,7 @@ export default function ScouterGrid({ isLoading, activeInspirations, selectInspi
   } = useUIStore();
 
   return (
-    <div className="flex-1 overflow-y-auto p-8 flex flex-col gap-6">
+    <div className="flex-1 overflow-y-auto custom-scrollbar-dark p-8 flex flex-col gap-6">
       <div className="flex flex-col gap-1.5">
         <h2 className="text-2xl font-black tracking-tight">영감 스카우터</h2>
         <p className="text-xs text-zinc-500">정부 뉴스, 시사 보도에서 리얼리티를 확보할 드라마틱한 갈등 자산을 찾아냅니다.</p>

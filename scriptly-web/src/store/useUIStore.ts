@@ -10,6 +10,7 @@ interface UIState {
   isRightPanelOpen: boolean;
   isDarkMode: boolean;
   sidebarWidth: number;
+  rightPanelWidth: number;
   
   // 3. 선택된 데이터 컨텍스트 ID
   selectedProjectId: string | null;
@@ -38,6 +39,7 @@ interface UIState {
   setRightPanelOpen: (open: boolean) => void;
   setDarkMode: (dark: boolean) => void;
   setSidebarWidth: (width: number) => void;
+  setRightPanelWidth: (width: number) => void;
   selectProject: (projectId: string | null) => void;
   selectInspiration: (id: string | null) => void;
   selectArchive: (id: string | null) => void;
@@ -55,6 +57,7 @@ export const useUIStore = create<UIState>((set) => ({
   isRightPanelOpen: true,
   isDarkMode: true,
   sidebarWidth: 260,
+  rightPanelWidth: 350,
   
   selectedProjectId: null,
   selectedInspirationId: null,
@@ -80,6 +83,7 @@ export const useUIStore = create<UIState>((set) => ({
   setRightPanelOpen: (open) => set({ isRightPanelOpen: open }),
   setDarkMode: (dark) => set({ isDarkMode: dark }),
   setSidebarWidth: (width) => set({ sidebarWidth: width }),
+  setRightPanelWidth: (width) => set({ rightPanelWidth: width }),
   selectProject: (projectId) => set({ selectedProjectId: projectId }),
   selectInspiration: (id) => set({ selectedInspirationId: id }),
   selectArchive: (id) => set({ selectedArchiveId: id }),

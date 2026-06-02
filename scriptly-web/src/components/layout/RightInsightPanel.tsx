@@ -35,6 +35,8 @@ export default function RightInsightPanel({
   addToast
 }: RightInsightPanelProps) {
   const {
+    rightPanelWidth,
+    setRightPanelWidth,
     activeActivity,
     inspirationSubTab,
     isRightPanelOpen,
@@ -43,16 +45,49 @@ export default function RightInsightPanel({
   } = useUIStore();
 
   const [openReferenceAccordionId, setOpenReferenceAccordionId] = useState<string | null>("insp_1");
+  const [isResizing, setIsResizing] = useState(false);
+
+  React.useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (isResizing) {
+        const width = window.innerWidth - e.clientX;
+        setRightPanelWidth(Math.max(250, Math.min(600, width)));
+      }
+    };
+    const handleMouseUp = () => setIsResizing(false);
+
+    if (isResizing) {
+      window.addEventListener("mousemove", handleMouseMove);
+      window.addEventListener("mouseup", handleMouseUp);
+    }
+    return () => {
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mouseup", handleMouseUp);
+    };
+  }, [isResizing, setRightPanelWidth]);
 
   if (!isRightPanelOpen) return null;
 
   const hasAnalysis = currentInspiration && analyzedProjects[currentInspiration.id];
 
   return (
-    <aside className={cn(
-      "w-[350px] border-l h-full flex flex-col shrink-0 overflow-y-auto custom-scrollbar-dark select-none",
-      isDarkMode ? "bg-[#09090C] border-zinc-800/80" : "bg-[#F8F9FC] border-zinc-200"
-    )}>
+    <aside 
+      style={{ width: `${rightPanelWidth}px` }}
+      className={cn(
+        "border-l h-full flex flex-col shrink-0 overflow-hidden select-none relative",
+        isDarkMode ? "bg-[#09090C] border-zinc-800/80" : "bg-[#F8F9FC] border-zinc-200"
+      )}
+    >
+      {/* 리사이즈 드래그 핸들 */}
+      <div 
+        onMouseDown={(e) => {
+          e.preventDefault();
+          setIsResizing(true);
+        }}
+        className="absolute top-0 left-0 w-1.5 h-full cursor-ew-resize hover:bg-amber-500/40 active:bg-amber-500 transition-all z-50 group flex items-center justify-center"
+      >
+        <div className="w-[1px] h-8 bg-zinc-800 group-hover:bg-amber-500/60 opacity-0 group-hover:opacity-100 transition-opacity" />
+      </div>
       
       {/* A. [대메뉴: 영감 기획실] 일 때 우측 패널 -> 개별 퀵 인사이트(Quick Insight) 모드 */}
       {activeActivity === "inspiration" && (

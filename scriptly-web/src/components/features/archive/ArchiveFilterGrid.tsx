@@ -27,7 +27,7 @@ export default function ArchiveFilterGrid({
   } = useUIStore();
 
   return (
-    <div className="flex-1 overflow-y-auto p-8 flex flex-col gap-6">
+    <div className="flex-1 overflow-y-auto custom-scrollbar-dark p-8 flex flex-col gap-6">
       <div className="flex flex-col gap-1">
         <h2 className="text-2xl font-black tracking-tight">수집된 영감 보관함</h2>
         <p className="text-xs text-zinc-500">대본 및 캐릭터 관계 설계 시 갈등의 축으로 삼을 수 있는 극화 변환 조각들입니다.</p>

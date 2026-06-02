@@ -27,6 +27,10 @@ class NoteCreateRequest(BaseModel):
     title: str
     content: str
 
+class NoteUpdateRequest(BaseModel):
+    title: str
+    content: str
+
 router = APIRouter(prefix="/archive", tags=["Archive"])
 logger = logging.getLogger(__name__)
 
@@ -241,3 +245,41 @@ async def delete_source(
     await db.delete(source)
     await db.commit()
     return None
+
+@router.patch("/note/{source_id}", response_model=Source)
+async def update_note_source(
+    source_id: uuid.UUID,
+    request: NoteUpdateRequest,
+    background_tasks: BackgroundTasks,
+    current_user: UserModel = Depends(AuthService.get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """직접 작성한 극작 메모를 수정하고 AI 상세 분석을 재활성화합니다."""
+    source = await get_source_for_user(source_id, current_user, db)
+    
+    if source.type != "NOTE":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="메모(NOTE) 타입의 영감만 수정이 가능합니다."
+        )
+    
+    # 수정 반영
+    source.title = request.title
+    source.content = request.content
+    
+    # 극작 내용이 변경되었으므로 분석 결과를 리셋 및 대기 상태로 회수
+    source.analysis_status = AnalysisStatus.PENDING.value
+    source.tension_score = 0
+    source.tension_reason = "내용 변경에 따른 재분석 대기 중"
+    if source.source_metadata:
+        new_metadata = dict(source.source_metadata)
+        new_metadata.pop("detailed_analysis", None)
+        source.source_metadata = new_metadata
+    
+    await db.commit()
+    await db.refresh(source)
+    
+    # 비동기로 AI 재분석 기동
+    background_tasks.add_task(process_source_analysis, source.id)
+    
+    return Source.model_validate(source)

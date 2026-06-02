@@ -105,6 +105,19 @@ export function useArchive() {
     }
   };
 
+  const handleUpdateNote = async (id: string, title: string, content: string, onSuccess?: () => void, onFailure?: (msg: string) => void) => {
+    setIsUploading(true);
+    try {
+      await api.patch(`/archive/note/${id}`, { title, content });
+      if (onSuccess) onSuccess();
+      fetchArchiveItems();
+    } catch (e: any) {
+      if (onFailure) onFailure(e.response?.data?.detail || "메모 수정 실패");
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
   const handleDeleteArchiveItem = async (id: string, onSuccess?: () => void) => {
     try {
       await api.delete(`/archive/source/${id}`);
@@ -126,6 +139,7 @@ export function useArchive() {
     handleFileUpload,
     handleUrlArchive,
     handleCreateNote,
+    handleUpdateNote,
     handleDownloadFile,
     handleReanalyze,
     handleDeleteArchiveItem,

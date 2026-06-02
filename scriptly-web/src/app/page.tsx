@@ -26,6 +26,18 @@ import { useInsightLab } from "@/hooks/useInsightLab";
 import { useAuthStore } from "@/hooks/useAuth";
 import { useUIStore } from "@/store/useUIStore";
 
+const cleanHtml = (text: string): string => {
+  if (!text) return "";
+  return text
+    .replace(/<[^>]*>/g, "") // 모든 HTML 태그 영구 척결
+    .replace(/&quot;/g, '"')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&#39;/g, "'")
+    .trim();
+};
+
 export default function IntegratedPrototype() {
   const [isMounted, setIsMounted] = useState(false);
 
@@ -66,6 +78,7 @@ export default function IntegratedPrototype() {
     handleFileUpload,
     handleUrlArchive,
     handleCreateNote,
+    handleUpdateNote,
     handleDownloadFile,
     handleReanalyze,
     handleDeleteArchiveItem
@@ -259,6 +272,12 @@ export default function IntegratedPrototype() {
   // 보관함 필터 및 정렬용 Local State
   const [archiveFilter, setArchiveFilter] = useState<string>("all");
   const [archiveSort, setArchiveSort] = useState<string>("date");
+
+  // 직접 극작 메모(NOTE) 수정을 위한 Local State
+  const [isEditModalOpen, setIsEditModalOpen] = useState<boolean>(false);
+  const [editingNote, setEditingNote] = useState<any>(null);
+  const [editTitle, setEditTitle] = useState<string>("");
+  const [editContent, setEditContent] = useState<string>("");
 
   // 1단계 자유 대본 작성기 에디터 텍스트 상태
   const [scriptText, setScriptText] = useState<string>(
@@ -968,7 +987,7 @@ export default function IntegratedPrototype() {
                     filteredAndSortedArchives={computedArchives.map(item => ({
                       id: item.id,
                       title: item.title || "수집 파일",
-                      desc: item.type === "NOTE" ? item.content : (item.summary || item.content.substring(0, 120) + "..."),
+                      desc: item.type === "NOTE" ? item.content : (cleanHtml(item.summary || item.content).substring(0, 120) + (cleanHtml(item.summary || item.content) ? "..." : "")),
                       type: item.type === "NOTE" ? "✍️ 직접 메모" : item.type === "NEWS" ? "🔗 뉴스기사" : "📁 문서파일",
                       rawType: item.type,
                       tension_score: item.tension_score,
@@ -982,6 +1001,22 @@ export default function IntegratedPrototype() {
                       selectArchive(id);
                       const idx = archiveItems.findIndex(a => a.id === id);
                       if (idx !== -1) setSelectedArchiveIndex(idx);
+                    }}
+                    onEditClick={(item) => {
+                      const originalItem = archiveItems.find(a => a.id === item.id);
+                      if (originalItem) {
+                        setEditingNote(originalItem);
+                        setEditTitle(originalItem.title);
+                        setEditContent(originalItem.content);
+                        setIsEditModalOpen(true);
+                      }
+                    }}
+                    onDeleteClick={async (id) => {
+                      if (confirm("정말 이 영감 자산을 삭제하시겠습니까?")) {
+                        await handleDeleteArchiveItem(id, () => {
+                          addToast("영감 자산이 영구히 삭제되었습니다.", "success");
+                        });
+                      }
                     }}
                   />
                 </div>
@@ -1149,6 +1184,95 @@ export default function IntegratedPrototype() {
 
       {/* --- 글로벌 팝업 & 모달 기획창 --- */}
       
+      {/* 1-2. 극작 메모 수정 모달 (신설) */}
+      {isEditModalOpen && editingNote && (
+        <div className="fixed inset-0 bg-black/85 flex items-center justify-center z-[1000] p-4 animate-in fade-in duration-300">
+          <div className="bg-[#14141A] border border-zinc-800 rounded-3xl w-full max-w-xl overflow-hidden flex flex-col shadow-2xl">
+            <div className="p-6 border-b border-zinc-800/40 flex items-center justify-between">
+              <div className="flex flex-col gap-1">
+                <h3 className="text-sm font-black text-white">✍️ 극작 메모 수정</h3>
+                <span className="text-[10px] text-zinc-500">기존에 작성한 수집 아이디어나 메모의 제목 및 내용을 수정합니다.</span>
+              </div>
+              <button 
+                onClick={() => {
+                  setIsEditModalOpen(false);
+                  setEditingNote(null);
+                }} 
+                className="p-2 hover:bg-zinc-800 rounded-xl text-zinc-500 hover:text-white transition-all"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="p-6 flex flex-col gap-5 bg-[#0A0A0E]/30">
+              <div className="flex flex-col gap-2">
+                <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider">메모 제목</span>
+                <input 
+                  type="text"
+                  value={editTitle}
+                  onChange={(e) => setEditTitle(e.target.value)}
+                  placeholder="갈등의 성격을 대표하는 제목을 지어주세요..."
+                  className="w-full bg-[#0E0E12] border border-zinc-800 p-3 rounded-2xl text-xs font-bold text-white focus:border-amber-500/50 outline-none transition-all"
+                />
+              </div>
+
+              <div className="flex flex-col gap-2">
+                <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider">메모 상세 기술 (줄바꿈 포함 가능)</span>
+                <textarea 
+                  value={editContent}
+                  onChange={(e) => setEditContent(e.target.value)}
+                  rows={8}
+                  placeholder="뉴스에서 영감을 얻은 서사적 대립, 캐릭터 관계 변화 및 긴장감 연출 요소를 상세히 적어보세요..."
+                  className="w-full bg-[#0E0E12] border border-zinc-800 p-4 rounded-2xl text-xs font-semibold text-zinc-300 focus:border-amber-500/50 outline-none leading-relaxed transition-all resize-none"
+                />
+              </div>
+            </div>
+
+            <div className="p-6 border-t border-zinc-800/40 flex justify-end gap-2.5 bg-[#0A0A0E]/50">
+              <button 
+                onClick={() => {
+                  setIsEditModalOpen(false);
+                  setEditingNote(null);
+                }}
+                className="px-5 py-2.5 bg-zinc-900 border border-zinc-800 hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 text-xs font-bold rounded-xl transition-all"
+              >
+                취소
+              </button>
+              <button 
+                onClick={async () => {
+                  if (!editTitle.trim()) {
+                    addToast("메모 제목을 기입해주세요.", "warning");
+                    return;
+                  }
+                  if (!editContent.trim()) {
+                    addToast("메모 상세 내용을 적어주세요.", "warning");
+                    return;
+                  }
+                  
+                  await handleUpdateNote(
+                    editingNote.id,
+                    editTitle,
+                    editContent,
+                    () => {
+                      addToast("극작 메모가 성공적으로 수정되었습니다. AI 재분석이 백그라운드 기동됩니다.", "success");
+                      setIsEditModalOpen(false);
+                      setEditingNote(null);
+                    },
+                    (msg) => {
+                      addToast(msg, "error");
+                    }
+                  );
+                }}
+                disabled={isUploading}
+                className="px-6 py-2.5 bg-amber-500 hover:bg-amber-400 text-black text-xs font-black rounded-xl transition-all shadow-lg active:scale-95 flex items-center justify-center gap-1.5"
+              >
+                {isUploading ? "저장 중..." : "저장"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* 1. 신규 영감 수집 모달 (극작 메모 직접 작성 탭 탑재 및 실데이터 저장 연동 완료) */}
       {isCollectModalOpen && (
         <div className="fixed inset-0 bg-black/85 flex items-center justify-center z-[1000] p-4 animate-in fade-in duration-300">

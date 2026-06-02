@@ -1,24 +1,28 @@
 "use client";
-
+ 
 import React from "react";
-import { Check, FolderPlus, Bookmark } from "lucide-react";
+import { Check, FolderPlus, Bookmark, Pencil, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useUIStore } from "@/store/useUIStore";
-
+ 
 interface ArchiveFilterGridProps {
   filteredAndSortedArchives: any[];
   projectLinkedInspirations: string[];
   setProjectLinkedInspirations: React.Dispatch<React.SetStateAction<string[]>>;
   addToast: (msg: string, type?: "success" | "info" | "warning" | "error") => void;
   selectArchive?: (id: string) => void;
+  onEditClick?: (item: any) => void;
+  onDeleteClick?: (id: string) => void;
 }
-
+ 
 export default function ArchiveFilterGrid({
   filteredAndSortedArchives,
   projectLinkedInspirations,
   setProjectLinkedInspirations,
   addToast,
-  selectArchive
+  selectArchive,
+  onEditClick,
+  onDeleteClick
 }: ArchiveFilterGridProps) {
   const {
     isDarkMode,
@@ -45,7 +49,7 @@ export default function ArchiveFilterGrid({
               }
             }}
             className={cn(
-              "p-6 rounded-2xl border cursor-pointer transition-all duration-300 hover:-translate-y-0.5 flex flex-col gap-3 relative overflow-hidden",
+              "p-6 rounded-2xl border cursor-pointer transition-all duration-300 hover:-translate-y-0.5 flex flex-col gap-3 relative overflow-hidden group",
               selectedArchiveId === item.id 
                 ? (isDarkMode ? "bg-[#1E1E28] border-amber-500 shadow-xl shadow-amber-500/5" : "bg-amber-50/40 border-amber-500 shadow-md")
                 : (isDarkMode ? "bg-[#14141A] border-zinc-800 hover:border-zinc-700" : "bg-white border-zinc-200 hover:border-zinc-300 shadow-sm")
@@ -53,7 +57,42 @@ export default function ArchiveFilterGrid({
           >
             <div className="flex items-center justify-between">
               <span className="text-[9px] bg-amber-500/10 text-amber-400 px-2.5 py-0.5 rounded-full font-black">{item.type}</span>
-              <span className="text-[10px] text-zinc-500 font-semibold">{item.date}</span>
+              
+              <div className="flex items-center gap-1.5">
+                <span className="text-[10px] text-zinc-500 font-semibold mr-1">{item.date}</span>
+                
+                {/* 수정 및 삭제 버튼 제어 바 (평소 반투명, 카드 호버 시 선명) */}
+                <div className="flex items-center gap-1 opacity-45 group-hover:opacity-100 transition-all duration-300">
+                  {item.rawType === "NOTE" && (
+                    <button 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (onEditClick) onEditClick(item);
+                      }}
+                      className={cn(
+                        "p-1.5 rounded-lg transition-all active:scale-90 hover:scale-110",
+                        isDarkMode ? "hover:bg-zinc-800 text-zinc-400 hover:text-white" : "hover:bg-zinc-100 text-zinc-500 hover:text-zinc-950"
+                      )}
+                      title="메모 수정"
+                    >
+                      <Pencil size={11} />
+                    </button>
+                  )}
+                  
+                  <button 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (onDeleteClick) onDeleteClick(item.id);
+                    }}
+                    className={cn(
+                      "p-1.5 rounded-lg transition-all active:scale-90 hover:scale-110 hover:bg-rose-500/10 text-zinc-400 hover:text-rose-500"
+                    )}
+                    title="영감 삭제"
+                  >
+                    <Trash2 size={11} />
+                  </button>
+                </div>
+              </div>
             </div>
             <h3 className={cn(
               "text-sm font-black leading-relaxed hover:text-amber-400 transition-colors",

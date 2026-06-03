@@ -123,7 +123,17 @@ export default function IntegratedPrototype() {
     generateLogline,
     generateSynopsis,
     exportProject,
-    isGeneratingSynopsis
+    isGeneratingSynopsis,
+    
+    // Scripts 추가 연동
+    scripts,
+    currentScript,
+    setCurrentScript,
+    isLoadingScripts,
+    fetchScripts,
+    createScript,
+    updateScript,
+    deleteScript
   } = useInsightLab(isDarkMode);
 
   // 6. 하이드레이션 마운트가 완료되고 인증되지 않은 경우에만 강제 로그인 리다이렉트
@@ -156,6 +166,23 @@ export default function IntegratedPrototype() {
       selectProject(projects[0].id);
     }
   }, [projects, selectedProjectId, selectProject]);
+
+  // selectedProjectId 변경 시 hookSelectProject 자동 호출 연동 (파라미터 안전성 및 로딩 보장)
+  useEffect(() => {
+    if (selectedProjectId) {
+      const proj = projects.find(p => p.id === selectedProjectId);
+      if (proj) {
+        hookSelectProject(proj);
+      }
+    }
+  }, [selectedProjectId, projects, hookSelectProject]);
+
+  // 에디터 탭 진입 시 대본 목록 자동 동기화
+  useEffect(() => {
+    if (activeWorkspaceTab === "editor" && selectedProjectId) {
+      fetchScripts(selectedProjectId);
+    }
+  }, [activeWorkspaceTab, selectedProjectId, fetchScripts]);
 
   // 반응형 Index 동기화 훅: Zustand ID 변경 시 custom hooks의 active index 상태를 뒤에서 자동 매핑
   useEffect(() => {
@@ -820,7 +847,6 @@ export default function IntegratedPrototype() {
                   onChange={(e) => {
                     const nextId = e.target.value;
                     selectProject(nextId);
-                    hookSelectProject(nextId);
                   }}
                   className={cn(
                     "w-full px-3 py-2.5 rounded-xl border text-xs font-extrabold outline-none appearance-none cursor-pointer pr-8 transition-all",
@@ -1158,8 +1184,14 @@ export default function IntegratedPrototype() {
 
               {activeWorkspaceTab === "editor" && (
                 <ScriptEditor 
-                  scriptText={scriptText} 
-                  setScriptText={setScriptText} 
+                  projectId={selectedProjectId}
+                  scripts={scripts}
+                  currentScript={currentScript}
+                  setCurrentScript={setCurrentScript}
+                  createScript={createScript}
+                  updateScript={updateScript}
+                  deleteScript={deleteScript}
+                  isLoading={isLoadingScripts}
                   addToast={addToast} 
                 />
               )}

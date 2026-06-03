@@ -286,3 +286,30 @@ class CharacterRead(CharacterBase):
     project_id: UUID
     created_at: datetime
     updated_at: datetime
+
+
+# --- Scripts (New Structure for Phase 3) ---
+
+class ScriptBase(DomainModel):
+    """대본 기본 구조"""
+    title: str
+    episode_number: int = 1
+    content: str = ""
+
+class ScriptCreate(ScriptBase):
+    """대본 생성용 DTO"""
+    project_id: UUID
+
+class ScriptUpdate(BaseModel):
+    """대본 수정용 DTO"""
+    title: Optional[str] = None
+    episode_number: Optional[int] = None
+    content: Optional[str] = None
+
+class ScriptRead(ScriptBase):
+    """대본 조회용 DTO"""
+    id: UUID
+    project_id: UUID
+    user_id: UUID
+    created_at: datetime
+    updated_at: datetime

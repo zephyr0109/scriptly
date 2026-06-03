@@ -103,13 +103,27 @@
   - `created_at`: 생성일
   - `updated_at`: 수정일
 
+### I. Script (대본)
+드라마 프로젝트 내에서 실제로 작성되는 회차별 대본(시나리오) 데이터입니다. 특정 Project에 속합니다.
+- **Attributes**:
+  - `id`: UUID (Primary Key)
+  - `project_id`: ForeignKey (Project.id, 필수)
+  - `user_id`: ForeignKey (User.id, 필수)
+  - `title`: 대본 제목 (예: "제1화: 소리 없는 목소리")
+  - `episode_number`: Integer (회차 번호, 예: 1, 2)
+  - `content`: 대본 본문 텍스트 (Markdown 형식 지문 및 대사)
+  - `created_at`: 생성일
+  - `updated_at`: 수정일
+
 ## 3. 엔티티 관계도 (Entity Relationship)
 
 ```mermaid
 erDiagram
     USER ||--o{ PROJECT : "owns"
+    USER ||--o{ SCRIPT : "writes"
     PROJECT ||--o{ CHARACTER : "manages"
     PROJECT ||--o{ INSPIRATION_CARD : "contains"
+    PROJECT ||--o{ SCRIPT : "contains"
     
     SOURCE ||--o{ DRAMATIC_ELEMENT : "extracts"
     SOURCE ||--o{ CHARACTER : "identifies"
@@ -130,3 +144,4 @@ erDiagram
 2.  **Insight Extraction**: `Source`를 LLM으로 분석하여 `DramaticElement`와 `Character` 추출 및 `Project`에 할당.
 3.  **Synthesis**: 작가가 여러 요소를 조합하여 `InspirationCard`를 생성하고 `status`를 관리.
 4.  **Drafting**: `InspirationCard`의 맥락과 선택한 장르를 바탕으로 LLM이 `SceneDraft`를 생성.
+5.  **Script Writing**: 기획 및 분석 소재들을 참고하여 작가가 대본 에디터에서 회차별 `Script`를 실시간 직접 집필하고 보관.

@@ -445,6 +445,77 @@ export function useInsightLab(isDarkMode: boolean) {
     } catch (e) { return false; }
   }, [board, nodes, edges]);
 
+  // 대본 관련 상태
+  const [scripts, setScripts] = useState<any[]>([]);
+  const [currentScript, setCurrentScript] = useState<any>(null);
+  const [isLoadingScripts, setIsLoadingScripts] = useState(false);
+
+  // 대본 CRUD API 연동
+  const fetchScripts = useCallback(async (projectId: string) => {
+    setIsLoadingScripts(true);
+    try {
+      const resp = await api.get(`/scripts?project_id=${projectId}`);
+      setScripts(resp.data);
+      if (resp.data.length > 0) {
+        setCurrentScript(resp.data[0]);
+      } else {
+        setCurrentScript(null);
+      }
+    } catch (e) {
+      console.error("Failed to fetch scripts:", e);
+    } finally {
+      setIsLoadingScripts(false);
+    }
+  }, []);
+
+  const createScript = useCallback(async (projectId: string, title: string, episodeNumber: number) => {
+    try {
+      const resp = await api.post("/scripts", {
+        project_id: projectId,
+        title,
+        episode_number: episodeNumber,
+        content: ""
+      });
+      const newScript = resp.data;
+      setScripts(prev => [...prev, newScript].sort((a, b) => a.episode_number - b.episode_number));
+      setCurrentScript(newScript);
+      return newScript;
+    } catch (e) {
+      console.error("Failed to create script:", e);
+    }
+    return null;
+  }, []);
+
+  const updateScript = useCallback(async (scriptId: string, updateData: any) => {
+    try {
+      const resp = await api.patch(`/scripts/${scriptId}`, updateData);
+      const updated = resp.data;
+      setScripts(prev => prev.map(s => s.id === scriptId ? updated : s).sort((a, b) => a.episode_number - b.episode_number));
+      setCurrentScript((curr: any) => curr && curr.id === scriptId ? updated : curr);
+      return updated;
+    } catch (e) {
+      console.error("Failed to update script:", e);
+    }
+    return null;
+  }, []);
+
+  const deleteScript = useCallback(async (scriptId: string) => {
+    try {
+      await api.delete(`/scripts/${scriptId}`);
+      setScripts(prev => {
+        const nextList = prev.filter(s => s.id !== scriptId);
+        if (currentScript?.id === scriptId) {
+          setCurrentScript(nextList.length > 0 ? nextList[0] : null);
+        }
+        return nextList;
+      });
+      return true;
+    } catch (e) {
+      console.error("Failed to delete script:", e);
+    }
+    return false;
+  }, [currentScript?.id]);
+
   return {
     projects, currentProject, isLoadingProjects, characters, labSources, nodes: enrichedNodes, setNodes, edges, setEdges,
     events, isGeneratingPlot,
@@ -452,6 +523,9 @@ export function useInsightLab(isDarkMode: boolean) {
     fetchEvents, createEvent, updateEvent, deleteEvent, reorderEvents, generatePlotDraft,
     generateLogline, generateSynopsis, exportProject,
     handleSendToLab, handleMoveToLab, handleSynthesizeOnDemand, handleExtract, handleImportSources, handleRemoveLabSource,
-    handleSaveLabSession, handleGenerateMapDraft, onNodesChange, onEdgesChange, isSynthesizing, isGeneratingSynopsis
+    handleSaveLabSession, handleGenerateMapDraft, onNodesChange, onEdgesChange, isSynthesizing, isGeneratingSynopsis,
+    
+    // Scripts 연동 추가
+    scripts, currentScript, setCurrentScript, isLoadingScripts, fetchScripts, createScript, updateScript, deleteScript
   };
 }

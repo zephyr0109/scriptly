@@ -54,7 +54,7 @@ async def get_trending_news(
                 summary=summary_clean,
                 content=summary_clean,
                 source_url=entry.link,
-                analysis_status=AnalysisStatus.PENDING.value,
+                analysis_status=AnalysisStatus.UNANALYZED.value,
                 source_metadata={"original_pubDate": entry.published if hasattr(entry, 'published') else ""}
             )
             db.add(article)
@@ -65,8 +65,8 @@ async def get_trending_news(
     if articles:
         await db.commit()
         for a in articles: await db.refresh(a)
-        background_tasks.add_task(process_news_batch, [a.id for a in articles])
-
+        # background_tasks.add_task(process_news_batch, [a.id for a in articles])
+ 
     results = []
     for a in articles:
         results.append({
@@ -78,7 +78,7 @@ async def get_trending_news(
                 "pubDate": a.source_metadata.get("original_pubDate")
             },
             "analysis_status": a.analysis_status,
-            "tension_evaluation": {"score": 0, "reason": "분석 예약됨", "potential_conflict": "분석 대기 중"}
+            "tension_evaluation": {"score": 0, "reason": "분석 전", "potential_conflict": "분석 대기 중"}
         })
     return results
 
@@ -151,14 +151,14 @@ async def trigger_analysis(
             summary=summary_clean,
             content=summary_clean,
             source_url=item.get("link", ""),
-            analysis_status=AnalysisStatus.PENDING.value
+            analysis_status=AnalysisStatus.UNANALYZED.value
         )
         db.add(article)
         new_articles.append(article)
 
     await db.commit()
     for a in new_articles: await db.refresh(a)
-    background_tasks.add_task(process_news_batch, [a.id for a in new_articles])
+    # background_tasks.add_task(process_news_batch, [a.id for a in new_articles])
 
     articles_response = []
     for a, item in zip(new_articles, raw_news):
@@ -170,8 +170,8 @@ async def trigger_analysis(
                 "link": item.get("link", ""),
                 "pubDate": item.get("pubDate", "")
             },
-            "tension_evaluation": {"score": 0, "reason": "AI 분석 진행 중...", "potential_conflict": "분석 중..."},
-            "analysis_status": AnalysisStatus.PENDING.value
+            "tension_evaluation": {"score": 0, "reason": "분석 전", "potential_conflict": "분석 대기 중"},
+            "analysis_status": AnalysisStatus.UNANALYZED.value
         })
     return articles_response
 
@@ -201,6 +201,7 @@ async def analyze_news_detail(
         new_metadata["detailed_analysis"] = detail_result
         article.tension_score = detail_result.get("tension_score", article.tension_score)
         article.tension_reason = detail_result.get("tension_reason", article.tension_reason)
+        article.analysis_status = AnalysisStatus.COMPLETED.value
         article.source_metadata = new_metadata
         await db.commit()
         return detail_result

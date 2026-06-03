@@ -36,42 +36,42 @@ export function useCuration(fetchArchiveItems: () => void) {
     fetchTrendingNews();
   }, [isAuthenticated]);
 
-  // 스카우터 상태 폴링 로직
-  useEffect(() => {
-    if (!isAuthenticated) return;
-    const pendingItems = newsResults.filter(r => r.analysis_status === "PENDING" || r.analysis_status === "PROCESSING");
-    if (pendingItems.length === 0) return;
-    const intervalId = setInterval(async () => {
-      try {
-        const ids = pendingItems.map(item => item.id).join(",");
-        const response = await api.get(`/news/status?ids=${ids}`);
-        const data = response.data;
-        
-        setNewsResults(prevResults => {
-          const nextResults = [...prevResults];
-          let changed = false;
-          data.results.forEach((statusData: any) => {
-            const idx = nextResults.findIndex(r => r.id === statusData.id);
-            if (idx !== -1 && statusData.analysis_status !== "PENDING" && statusData.analysis_status !== "PROCESSING") {
-              nextResults[idx] = {
-                ...nextResults[idx],
-                analysis_status: statusData.analysis_status,
-                detail_analysis: nextResults[idx].detail_analysis || statusData.detail_analysis,
-                tension_evaluation: {
-                  score: statusData.tension_score || 0,
-                  reason: statusData.tension_reason || "분석 완료",
-                  potential_conflict: statusData.potential_conflict || "확인 중"
-                }
-              };
-              changed = true;
-            }
-          });
-          return changed ? nextResults : prevResults;
-        });
-      } catch (e) { console.error('Failed to fetch analysis status:', e); }
-    }, 3000);
-    return () => clearInterval(intervalId);
-  }, [newsResults]);
+  // 스카우터 상태 폴링 로직 (자동 일괄 분석 비활성화 및 수동 개별 동기 분석으로 변경되어 제거됨)
+  // useEffect(() => {
+  //   if (!isAuthenticated) return;
+  //   const pendingItems = newsResults.filter(r => r.analysis_status === "PENDING" || r.analysis_status === "PROCESSING");
+  //   if (pendingItems.length === 0) return;
+  //   const intervalId = setInterval(async () => {
+  //     try {
+  //       const ids = pendingItems.map(item => item.id).join(",");
+  //       const response = await api.get(`/news/status?ids=${ids}`);
+  //       const data = response.data;
+  //       
+  //       setNewsResults(prevResults => {
+  //         const nextResults = [...prevResults];
+  //         let changed = false;
+  //         data.results.forEach((statusData: any) => {
+  //           const idx = nextResults.findIndex(r => r.id === statusData.id);
+  //           if (idx !== -1 && statusData.analysis_status !== "PENDING" && statusData.analysis_status !== "PROCESSING") {
+  //             nextResults[idx] = {
+  //               ...nextResults[idx],
+  //               analysis_status: statusData.analysis_status,
+  //               detail_analysis: nextResults[idx].detail_analysis || statusData.detail_analysis,
+  //               tension_evaluation: {
+  //                 score: statusData.tension_score || 0,
+  //                 reason: statusData.tension_reason || "분석 완료",
+  //                 potential_conflict: statusData.potential_conflict || "확인 중"
+  //               }
+  //             };
+  //             changed = true;
+  //           }
+  //         });
+  //         return changed ? nextResults : prevResults;
+  //       });
+  //     } catch (e) { console.error('Failed to fetch analysis status:', e); }
+  //   }, 3000);
+  //   return () => clearInterval(intervalId);
+  // }, [newsResults]);
 
   const handleSearch = async (query: string, start: number = 1, onSearchSuccess?: () => void) => {
     if (!query.trim()) return;

@@ -16,6 +16,7 @@ class SourceType(str, Enum):
     NOTE = "NOTE"
 
 class AnalysisStatus(str, Enum):
+    UNANALYZED = "UNANALYZED"
     PENDING = "PENDING"
     PROCESSING = "PROCESSING"
     COMPLETED = "COMPLETED"

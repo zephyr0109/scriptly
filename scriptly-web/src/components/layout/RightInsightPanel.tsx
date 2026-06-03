@@ -69,6 +69,59 @@ export default function RightInsightPanel({
   if (!isRightPanelOpen) return null;
 
   const hasAnalysis = currentInspiration && analyzedProjects[currentInspiration.id];
+  const isSourceAnalyzing = isAnalyzingQuick || 
+    (currentInspiration && 
+      (currentInspiration.analysis_status === "PENDING" || 
+       currentInspiration.analysis_status === "PROCESSING"));
+
+  const getSourceDisplay = () => {
+    if (!currentInspiration) return "";
+    
+    if (inspirationSubTab === "archive") {
+      if (currentInspiration.type === "NOTE" || currentInspiration.rawType === "NOTE") {
+        return "✍️ 직접 작성 메모";
+      }
+      if (currentInspiration.type === "FILE" || currentInspiration.rawType === "FILE") {
+        return `📁 첨부 문서 (${currentInspiration.original_filename || "파일"})`;
+      }
+      if (currentInspiration.type === "NEWS" || currentInspiration.rawType === "NEWS") {
+        const url = currentInspiration.source_url || currentInspiration.url;
+        if (url && url !== "#") {
+          try {
+            const host = new URL(url).hostname;
+            return `🔗 뉴스 기사 (${host.replace("www.", "")})`;
+          } catch (e) {}
+        }
+        return "🔗 뉴스 기사 링크";
+      }
+    }
+    
+    const sourceName = currentInspiration.source || (currentInspiration.url?.includes("naver.com") ? "네이버 뉴스" : "구글 뉴스");
+    return `📰 검색 뉴스 (${sourceName})`;
+  };
+
+  const getDateDisplay = () => {
+    if (!currentInspiration) return "";
+    
+    const formatDate = (dateStr: string) => {
+      if (!dateStr) return "";
+      try {
+        const d = new Date(dateStr);
+        if (isNaN(d.getTime())) return dateStr;
+        return d.toISOString().split("T")[0];
+      } catch (e) {
+        return dateStr;
+      }
+    };
+
+    if (inspirationSubTab === "archive") {
+      const dateVal = currentInspiration.ingested_at || currentInspiration.created_at || currentInspiration.date;
+      return dateVal ? `${formatDate(dateVal)} 수집됨` : "최근 수집";
+    }
+    
+    const dateVal = currentInspiration.date || currentInspiration.article?.pubDate;
+    return dateVal ? `${formatDate(dateVal)} 발행됨` : "최근 발행";
+  };
 
   return (
     <aside 
@@ -132,9 +185,9 @@ export default function RightInsightPanel({
                 </div>
                 
                 <div className="flex items-center gap-2 text-[10px] text-zinc-500 font-semibold mt-1">
-                  <span>{currentInspiration.source || "직접 작성"}</span>
+                  <span>{getSourceDisplay()}</span>
                   <span>•</span>
-                  <span>{currentInspiration.date || "최근 수집"}</span>
+                  <span>{getDateDisplay()}</span>
                 </div>
 
                 {/* 극작 메모 직접 작성 자산인 경우 본문 표출 */}
@@ -157,8 +210,8 @@ export default function RightInsightPanel({
                   </span>
                 </div>
 
-                {/* 1. 분석 중 상태 */}
-                {isAnalyzingQuick && (
+                {/* 1. 분석 중 상태 (이전 분석 결과 캐시가 없을 때만 거대 스피너 노출) */}
+                {isSourceAnalyzing && !analyzedProjects[currentInspiration.id] && (
                   <div className={cn(
                     "p-8 rounded-2xl border flex flex-col items-center justify-center gap-3 py-12 text-center",
                     isDarkMode ? "bg-[#14141E] border-zinc-800" : "bg-white border-zinc-200"
@@ -168,8 +221,21 @@ export default function RightInsightPanel({
                   </div>
                 )}
 
+                {/* 1.5 분석 실패 상태 (이전 분석 캐시가 없을 때만 실패 경고 뷰 렌더링) */}
+                {!isSourceAnalyzing && currentInspiration && currentInspiration.analysis_status === "FAILED" && !analyzedProjects[currentInspiration.id] && (
+                  <div className={cn(
+                    "p-8 rounded-2xl border text-center flex flex-col items-center gap-3 py-10",
+                    isDarkMode ? "bg-red-500/5 border-red-500/20" : "bg-red-50 border-red-200"
+                  )}>
+                    <ShieldAlert size={24} className="text-red-500" />
+                    <span className="text-[11px] text-red-500 leading-relaxed font-extrabold">
+                      AI 분석에 실패했습니다. API 사용량(Quota) 초과 등의 사유일 수 있으니 잠시 후 다시 시도해 주세요.
+                    </span>
+                  </div>
+                )}
+
                 {/* 2. 분석 대기 상태 */}
-                {!isAnalyzingQuick && !analyzedProjects[currentInspiration.id] && (
+                {!isSourceAnalyzing && !analyzedProjects[currentInspiration.id] && currentInspiration.analysis_status !== "FAILED" && (
                   <div className={cn(
                     "p-8 rounded-2xl border text-center flex flex-col items-center gap-3 py-10",
                     isDarkMode ? "bg-[#14141E]/40 border-zinc-800/60" : "bg-white border-zinc-200"
@@ -305,20 +371,22 @@ export default function RightInsightPanel({
                   {analyzedProjects[currentInspiration.id] ? (
                     <button 
                       onClick={() => handleTriggerQuickAnalysis(currentInspiration.id, inspirationSubTab === "archive")}
+                      // 백그라운드 재분석 도중 stuck/zombie 상태가 될 수 있으므로, 
+                      // 이전 데이터가 있다면 분석 중이라도 disabled 하지 않고 강제 재분석 트리거를 허용합니다.
                       disabled={isAnalyzingQuick}
                       className="flex-1 py-2.5 bg-zinc-800 hover:bg-zinc-700 text-amber-400 border border-zinc-700/60 text-[11px] font-black rounded-lg transition-all text-center flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer"
                     >
-                      <Sparkles size={12} className={cn(isAnalyzingQuick && "animate-spin")} />
-                      <span>{isAnalyzingQuick ? "재분석 진행 중..." : "AI 재분석 요청"}</span>
+                      <Sparkles size={12} className={cn(isSourceAnalyzing && "animate-spin")} />
+                      <span>{isSourceAnalyzing ? "재분석 진행 중..." : "AI 재분석 요청"}</span>
                     </button>
                   ) : (
                     <button 
                       onClick={() => handleTriggerQuickAnalysis(currentInspiration.id, inspirationSubTab === "archive")}
-                      disabled={isAnalyzingQuick}
+                      disabled={isSourceAnalyzing}
                       className="flex-1 py-2.5 bg-zinc-800 hover:bg-zinc-700 text-amber-400 border border-zinc-700/60 text-[11px] font-black rounded-lg transition-all text-center flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer"
                     >
-                      <Sparkles size={12} className={cn(isAnalyzingQuick && "animate-spin")} />
-                      <span>{isAnalyzingQuick ? "분석 진행 중..." : "AI 분석 요청"}</span>
+                      <Sparkles size={12} className={cn(isSourceAnalyzing && "animate-spin")} />
+                      <span>{isSourceAnalyzing ? "분석 진행 중..." : "AI 분석 요청"}</span>
                     </button>
                   )}
                   

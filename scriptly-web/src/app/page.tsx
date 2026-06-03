@@ -19,6 +19,13 @@ import CharacterMapDualView from "@/components/features/insight/CharacterMapDual
 import PlotTimeline from "@/components/features/insight/PlotTimeline";
 import ScriptEditor from "@/components/features/editor/ScriptEditor";
 
+// 신규 리팩토링 모달/토스트 컴포넌트 임포트
+import CollectModal from "@/components/features/modals/CollectModal";
+import ProjectCreateModal from "@/components/features/modals/ProjectCreateModal";
+import LinkArchiveModal from "@/components/features/modals/LinkArchiveModal";
+import CharacterModal from "@/components/features/modals/CharacterModal";
+import ToastContainer from "@/components/layout/ToastContainer";
+
 // 커스텀 훅 및 상태 관리 저장소 임포트
 import { useCuration } from "@/hooks/useCuration";
 import { useArchive } from "@/hooks/useArchive";
@@ -213,6 +220,25 @@ export default function IntegratedPrototype() {
     }, 3000);
   }, []);
 
+  // 보관함 비동기 분석 상태 변화 감지 및 토스트 알림 연동
+  const prevStatusesRef = React.useRef<Record<string, string>>({});
+  useEffect(() => {
+    if (!archiveItems || archiveItems.length === 0) return;
+    archiveItems.forEach(item => {
+      const prevStatus = prevStatusesRef.current[item.id];
+      const currentStatus = item.analysis_status;
+      if (prevStatus && prevStatus !== currentStatus) {
+        if (prevStatus === "PENDING" || prevStatus === "PROCESSING") {
+          if (currentStatus === "COMPLETED") {
+            addToast("AI 분석이 완료되었습니다.", "success");
+          } else if (currentStatus === "FAILED") {
+            addToast("AI 분석에 실패했습니다.", "error");
+          }
+        }
+      }
+      prevStatusesRef.current[item.id] = currentStatus;
+    });
+  }, [archiveItems, addToast]);
   // 사이드바 리사이즈 제어
   const [isResizingSidebar, setIsResizingSidebar] = useState<boolean>(false);
   useEffect(() => {
@@ -233,17 +259,7 @@ export default function IntegratedPrototype() {
     };
   }, [isResizingSidebar, setSidebarWidth]);
 
-  // 모달 수집 입력용 Local State
-  const [collectTab, setCollectTab] = useState<"url" | "file" | "note">("url");
-  const [collectUrl, setCollectUrl] = useState<string>("");
-  const [collectFile, setCollectFile] = useState<File | null>(null);
-  const [collectNoteTitle, setCollectNoteTitle] = useState<string>("");
-  const [collectNoteContent, setCollectNoteContent] = useState<string>("");
 
-  // 프로젝트 기획 생성 임시 State
-  const [newProjectName, setNewProjectName] = useState<string>("");
-  const [newProjectGenre, setNewProjectGenre] = useState<string>("스릴러");
-  const [newProjectLogline, setNewProjectLogline] = useState<string>("");
 
   // 프로젝트 참고 책장에 연결할 리스트 상태 (시뮬레이션)
   const [projectLinkedInspirations, setProjectLinkedInspirations] = useState<string[]>([]);
@@ -367,69 +383,7 @@ export default function IntegratedPrototype() {
     setModalOpen("character", false);
   };
 
-  // 신규 드라마 기획 생성
-  const handleCreateNewProject = async () => {
-    if (!newProjectName.trim()) {
-      addToast("드라마 프로젝트의 제목을 입력해주세요.", "error");
-      return;
-    }
-    try {
-      await createProject({
-        title: newProjectName,
-        genre: newProjectGenre,
-        logline: newProjectLogline || "작품의 로그라인이 아직 입력되지 않았습니다."
-      });
-      addToast(`신규 드라마 '${newProjectName}' 기획 워크스페이스가 생성되었습니다!`, "success");
-      setNewProjectName("");
-      setNewProjectGenre("스릴러");
-      setNewProjectLogline("");
-      setModalOpen("project", false);
-    } catch (e) {
-      addToast("프로젝트 생성에 실패했습니다.", "error");
-    }
-  };
 
-  // 모달을 통한 영감 수집
-  const handleCollectInspiration = async () => {
-    if (collectTab === "url") {
-      if (!collectUrl.trim()) {
-        addToast("수집할 URL을 입력해주세요.", "error");
-        return;
-      }
-      await handleUrlArchive(collectUrl, () => {
-        addToast("외부 링크 수집 및 변환이 완료되었습니다.", "success");
-        setCollectUrl("");
-        setModalOpen("collect", false);
-      }, (err) => {
-        addToast(err, "error");
-      });
-    } else if (collectTab === "file") {
-      if (!collectFile) {
-        addToast("업로드할 파일을 선택해주세요.", "error");
-        return;
-      }
-      await handleFileUpload(collectFile, () => {
-        addToast(`파일 '${collectFile.name}' 업로드 및 보관 처리가 완료되었습니다.`, "success");
-        setCollectFile(null);
-        setModalOpen("collect", false);
-      }, (err) => {
-        addToast(err, "error");
-      });
-    } else if (collectTab === "note") {
-      if (!collectNoteTitle.trim() || !collectNoteContent.trim()) {
-        addToast("메모의 제목과 내용을 모두 입력해주세요.", "error");
-        return;
-      }
-      await handleCreateNote(collectNoteTitle, collectNoteContent, () => {
-        addToast(`직접 작성한 극작 메모 '${collectNoteTitle}'이(가) 보관함에 적재되었습니다.`, "success");
-        setCollectNoteTitle("");
-        setCollectNoteContent("");
-        setModalOpen("collect", false);
-      }, (err) => {
-        addToast(err, "error");
-      });
-    }
-  };
 
   // 7. 실시간 뉴스 & 아카이브 데이터 퀵 인사이트 맵 바인딩 (더미 배제 및 Gemini 분석 1:1 맵핑)
   const analyzedProjectsMap = useMemo(() => {
@@ -528,15 +482,24 @@ export default function IntegratedPrototype() {
   // 9. AI 분석 요청 수동 트리거 및 백엔드 1:1 연동 (Index 동기화 완벽 보완)
   const handleTriggerQuickAnalysis = async (id: string, isFromArchive = false) => {
     if (isFromArchive) {
-      await handleReanalyze(id, () => {
-        addToast("보관 자산 정밀 AI 분석이 완전히 완료되었습니다.", "success");
-      });
+      await handleReanalyze(
+        id, 
+        () => {
+          addToast("AI 분석 요청이 접수되었습니다.", "info");
+        },
+        (msg) => {
+          addToast(msg || "AI 분석에 실패했습니다.", "error");
+        }
+      );
     } else {
-      await handleAnalyzeDetail(() => {
-        addToast("실시간 기사 극화 가공 분석이 완벽히 완료되었습니다.", "success");
-      }, () => {
-        addToast("상세 AI 극화 분석 도출에 실패했습니다.", "error");
-      });
+      await handleAnalyzeDetail(
+        () => {
+          addToast("AI 분석이 완료되었습니다.", "success");
+        }, 
+        (msg) => {
+          addToast(msg || "AI 분석에 실패했습니다.", "error");
+        }
+      );
     }
   };
 
@@ -1286,7 +1249,7 @@ export default function IntegratedPrototype() {
                     editTitle,
                     editContent,
                     () => {
-                      addToast("극작 메모가 성공적으로 수정되었습니다. AI 재분석이 백그라운드 기동됩니다.", "success");
+                      addToast("메모가 수정되었습니다.", "success");
                       setIsEditModalOpen(false);
                       setEditingNote(null);
                     },
@@ -1305,333 +1268,55 @@ export default function IntegratedPrototype() {
         </div>
       )}
 
-      {/* 1. 신규 영감 수집 모달 (극작 메모 직접 작성 탭 탑재 및 실데이터 저장 연동 완료) */}
-      {isCollectModalOpen && (
-        <div className="fixed inset-0 bg-black/85 flex items-center justify-center z-[1000] p-4 animate-in fade-in duration-300">
-          <div className="bg-[#14141A] border border-zinc-800 rounded-3xl w-full max-w-xl overflow-hidden flex flex-col shadow-2xl">
-            <div className="p-6 border-b border-zinc-800/40 flex items-center justify-between">
-              <div className="flex flex-col gap-1">
-                <h3 className="text-sm font-black text-white">영감 수집</h3>
-                <span className="text-[10px] text-zinc-500">기사 링크나 파일을 가져오거나, 메모를 직접 작성하여 저장합니다.</span>
-              </div>
-              <button onClick={() => setModalOpen("collect", false)} className="p-2 hover:bg-zinc-800 rounded-xl text-zinc-500 hover:text-white transition-all"><X size={16} /></button>
-            </div>
-
-            <div className="flex border-b border-zinc-800/30 p-2 bg-[#0E0E12] gap-1">
-              {[
-                { id: "url", label: "🔗 외부 기사 링크", icon: Globe },
-                { id: "file", label: "📁 첨부 파일 업로드", icon: FileText },
-                { id: "note", label: "✍️ 극작 메모 직접작성", icon: Plus }
-              ].map(tab => (
-                <button
-                  key={tab.id}
-                  onClick={() => setCollectTab(tab.id as any)}
-                  className={cn(
-                    "flex-1 py-2.5 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5",
-                    collectTab === tab.id ? "bg-amber-500 text-black font-black" : "text-zinc-500 hover:text-zinc-300"
-                  )}
-                >
-                  <tab.icon size={13} />
-                  <span>{tab.label}</span>
-                </button>
-              ))}
-            </div>
-
-            <div className="p-6 flex flex-col gap-4 flex-1">
-              {collectTab === "url" && (
-                <div className="flex flex-col gap-2 animate-in fade-in duration-250">
-                  <label className="text-[10px] text-amber-500 font-bold uppercase tracking-widest">수집 기사 및 블로그 URL 주소</label>
-                  <input 
-                    value={collectUrl} 
-                    onChange={(e) => setCollectUrl(e.target.value)} 
-                    placeholder="https://news.naver.com/main/read..." 
-                    className="w-full bg-zinc-900 border border-zinc-800 text-xs font-bold text-white px-4 py-3 rounded-xl outline-none focus:border-amber-500/50" 
-                  />
-                </div>
-              )}
-
-              {collectTab === "file" && (
-                <div className="flex flex-col gap-2 animate-in fade-in duration-250">
-                  <label className="text-[10px] text-amber-500 font-bold uppercase tracking-widest">로컬 PDF/TXT/DOCX 파일 첨부</label>
-                  <div className="border-2 border-dashed border-zinc-800 hover:border-amber-500/50 rounded-2xl p-8 text-center cursor-pointer transition-all flex flex-col items-center gap-2 bg-zinc-950/30">
-                    <Upload size={24} className="text-zinc-600" />
-                    <span className="text-xs text-zinc-400 font-bold">클릭하여 파일을 선택하거나 이 영역에 드래그</span>
-                    <input 
-                      type="file" 
-                      onChange={(e) => setCollectFile(e.target.files?.[0] || null)} 
-                      className="hidden" 
-                      id="collect-file" 
-                    />
-                    <label htmlFor="collect-file" className="px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-[10px] font-bold text-zinc-300 rounded-lg cursor-pointer transition-all mt-2">파일 찾기</label>
-                    {collectFile && <span className="text-[10px] text-amber-400 font-bold mt-2">선택된 파일: {collectFile.name}</span>}
-                  </div>
-                </div>
-              )}
-
-              {collectTab === "note" && (
-                <div className="flex flex-col gap-3 animate-in fade-in duration-250">
-                  <div className="flex flex-col gap-1.5">
-                    <label className="text-[10px] text-amber-500 font-bold uppercase tracking-widest">메모 제목</label>
-                    <input 
-                      value={collectNoteTitle} 
-                      onChange={(e) => setCollectNoteTitle(e.target.value)} 
-                      placeholder="강남 로비 장부의 4번째 씬 단서 기획" 
-                      className="w-full bg-zinc-900 border border-zinc-800 text-xs font-bold text-white px-4 py-2.5 rounded-xl outline-none focus:border-amber-500/50" 
-                    />
-                  </div>
-                  <div className="flex flex-col gap-1.5">
-                    <label className="text-[10px] text-amber-500 font-bold uppercase tracking-widest">메모 내용 및 극화 아이디어</label>
-                    <textarea 
-                      value={collectNoteContent} 
-                      onChange={(e) => setCollectNoteContent(e.target.value)} 
-                      rows={5} 
-                      placeholder="서부지검 씬에서 대리석 바닥을 걷는 소리와 함께 검찰 내부의 뇌물 수수 동선을 사실적으로 구성할 계획..." 
-                      className="w-full bg-zinc-900 border border-zinc-800 text-xs font-semibold text-white px-4 py-3 rounded-xl outline-none resize-none leading-relaxed focus:border-amber-500/50" 
-                    />
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <div className="p-6 border-t border-zinc-800/40 bg-[#0E0E12] flex justify-end gap-3">
-              <button onClick={() => setModalOpen("collect", false)} className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-white text-xs font-bold rounded-xl transition-all">취소</button>
-              <button onClick={handleCollectInspiration} className="px-5 py-2.5 bg-amber-500 text-black text-xs font-black rounded-xl transition-all shadow-md active:scale-95">저장</button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* 1. 신규 영감 수집 모달 */}
+      <CollectModal 
+        isOpen={isCollectModalOpen}
+        onClose={() => setModalOpen("collect", false)}
+        handleUrlArchive={handleUrlArchive}
+        handleFileUpload={handleFileUpload}
+        handleCreateNote={handleCreateNote}
+        addToast={addToast}
+      />
 
       {/* 2. 신규 드라마 기획 생성 모달 */}
-      {isProjectModalOpen && (
-        <div className="fixed inset-0 bg-black/85 flex items-center justify-center z-[1000] p-4 animate-in fade-in duration-300">
-          <div className="bg-[#14141A] border border-zinc-800 rounded-3xl w-full max-w-lg overflow-hidden flex flex-col shadow-2xl animate-in zoom-in-95 duration-200">
-            <div className="p-6 border-b border-zinc-800/40 flex items-center justify-between">
-              <div className="flex flex-col gap-1">
-                <h3 className="text-sm font-black text-white">신규 드라마 기획 워크스페이스 개설</h3>
-                <span className="text-[10px] text-zinc-500">집필하고 기획안을 보며 쓸 새로운 작품 기획 마당을 만듭니다.</span>
-              </div>
-              <button onClick={() => setModalOpen("project", false)} className="p-2 hover:bg-zinc-800 rounded-xl text-zinc-500 hover:text-white transition-all"><X size={16} /></button>
-            </div>
-
-            <div className="p-6 flex flex-col gap-4">
-              <div className="flex flex-col gap-1.5">
-                <label className="text-[10px] text-amber-500 font-bold uppercase tracking-widest">기획 작품 제목</label>
-                <input 
-                  value={newProjectName} 
-                  onChange={(e) => setNewProjectName(e.target.value)} 
-                  placeholder="예: 시그널 시즌2" 
-                  className="w-full bg-zinc-900 border border-zinc-800 text-xs font-bold text-white px-4 py-2.5 rounded-xl outline-none focus:border-amber-500/50" 
-                />
-              </div>
-
-              <div className="flex flex-col gap-1.5">
-                <label className="text-[10px] text-amber-500 font-bold uppercase tracking-widest">편성 장르 스타일</label>
-                <input 
-                  value={newProjectGenre} 
-                  onChange={(e) => setNewProjectGenre(e.target.value)} 
-                  placeholder="예: 범죄 수사 스릴러 / 휴먼 다큐" 
-                  className="w-full bg-zinc-900 border border-zinc-800 text-xs font-bold text-white px-4 py-2.5 rounded-xl outline-none focus:border-amber-500/50" 
-                />
-              </div>
-
-              <div className="flex flex-col gap-1.5">
-                <label className="text-[10px] text-amber-500 font-bold uppercase tracking-widest">작품 기본 로그라인</label>
-                <textarea 
-                  value={newProjectLogline} 
-                  onChange={(e) => setNewProjectLogline(e.target.value)} 
-                  rows={3} 
-                  placeholder="작품의 한 줄짜리 핵심 내러티브를 요약하세요..." 
-                  className="w-full bg-zinc-900 border border-zinc-800 text-xs font-semibold text-white px-4 py-3 rounded-xl outline-none resize-none leading-relaxed focus:border-amber-500/50" 
-                />
-              </div>
-            </div>
-
-            <div className="p-6 border-t border-zinc-800/40 bg-[#0E0E12] flex justify-end gap-3">
-              <button onClick={() => setModalOpen("project", false)} className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-white text-xs font-bold rounded-xl transition-all">취소</button>
-              <button onClick={handleCreateNewProject} className="px-5 py-2.5 bg-amber-500 text-black hover:bg-amber-400 text-xs font-black rounded-xl transition-all shadow-md active:scale-95">워크스페이스 생성</button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ProjectCreateModal 
+        isOpen={isProjectModalOpen}
+        onClose={() => setModalOpen("project", false)}
+        createProject={createProject}
+        addToast={addToast}
+      />
 
       {/* 3. 영감 불러오기 책장 연동 모달 */}
-      {isLinkArchiveModalOpen && (
-        <div className="fixed inset-0 bg-black/85 flex items-center justify-center z-[1000] p-4 animate-in fade-in duration-300">
-          <div className="bg-[#14141A] border border-zinc-800 rounded-3xl w-full max-w-lg overflow-hidden flex flex-col shadow-2xl animate-in zoom-in-95 duration-200">
-            <div className="p-6 border-b border-zinc-800/40 flex items-center justify-between">
-              <h3 className="text-sm font-black text-white">보관함에서 참고 영감 장부 불러오기</h3>
-              <button onClick={() => setModalOpen("linkArchive", false)} className="p-2 hover:bg-zinc-800 rounded-xl text-zinc-500 hover:text-white transition-all"><X size={16} /></button>
-            </div>
-
-            <div className="p-6 overflow-y-auto max-h-[300px] flex flex-col gap-2.5 custom-scrollbar-dark select-none">
-              {archiveItems.map(item => {
-                const isLinked = projectLinkedInspirations.includes(item.id);
-                return (
-                  <div 
-                    key={item.id}
-                    className={cn(
-                      "p-4 rounded-xl border flex items-center justify-between transition-all",
-                      isDarkMode ? "bg-zinc-900/60 border-zinc-800" : "bg-zinc-50 border-zinc-200"
-                    )}
-                  >
-                    <div className="flex flex-col gap-0.5 min-w-0 pr-4">
-                      <span className="text-xs font-black text-white truncate">{item.title}</span>
-                      <span className="text-[9px] text-zinc-500 font-bold uppercase tracking-wide">{item.type}</span>
-                    </div>
-                    {isLinked ? (
-                      <button 
-                        onClick={() => {
-                          setProjectLinkedInspirations(prev => prev.filter(id => id !== item.id));
-                          addToast("프로젝트 연동을 해제했습니다.", "info");
-                        }}
-                        className="px-2.5 py-1.5 bg-amber-500/10 border border-amber-500/30 text-amber-400 text-[10px] font-bold rounded-lg"
-                      >
-                        연결 해제
-                      </button>
-                    ) : (
-                      <button 
-                        onClick={() => {
-                          setProjectLinkedInspirations(prev => [...prev, item.id]);
-                          addToast("현재 프로젝트 집필실 서랍에 배치했습니다.", "success");
-                        }}
-                        className="px-2.5 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-[10px] font-bold rounded-lg transition-all"
-                      >
-                        책장에 적재
-                      </button>
-                    )}
-                  </div>
-                );
-              })}
-              {archiveItems.length === 0 && (
-                <div className="text-center py-8 text-xs text-zinc-500">수집된 영감 자산이 없습니다. 보관실에서 영감을 먼저 수집해 보세요.</div>
-              )}
-            </div>
-
-            <div className="p-6 border-t border-zinc-800/40 bg-[#0E0E12] flex justify-end">
-              <button onClick={() => setModalOpen("linkArchive", false)} className="px-5 py-2 bg-amber-500 text-black hover:bg-amber-400 text-xs font-black rounded-xl transition-all shadow-md active:scale-95">완료</button>
-            </div>
-          </div>
-        </div>
-      )}
+      <LinkArchiveModal 
+        isOpen={isLinkArchiveModalOpen}
+        onClose={() => setModalOpen("linkArchive", false)}
+        archiveItems={archiveItems}
+        projectLinkedInspirations={projectLinkedInspirations}
+        setProjectLinkedInspirations={setProjectLinkedInspirations}
+        addToast={addToast}
+      />
 
       {/* 4. 캐릭터 인물 추가/수정 CRUD 모달 */}
-      {isCharacterModalOpen && (
-        <div className="fixed inset-0 bg-black/85 flex items-center justify-center z-[1000] p-4 animate-in fade-in duration-300">
-          <div className="bg-[#14141A] border border-zinc-800 rounded-3xl w-full max-w-md overflow-hidden flex flex-col shadow-2xl animate-in zoom-in-95 duration-200">
-            <div className="p-6 border-b border-zinc-800/40 flex items-center justify-between">
-              <h3 className="text-sm font-black text-white">{activeCharacterId ? "등장인물 정보 수정" : "신규 인물 캐릭터 등록"}</h3>
-              <button onClick={() => setModalOpen("character", false)} className="p-2 hover:bg-zinc-800 rounded-xl text-zinc-500 hover:text-white transition-all"><X size={16} /></button>
-            </div>
-
-            <div className="p-6 flex flex-col gap-4">
-              <div className="flex flex-col gap-1.5">
-                <label className="text-[10px] text-amber-500 font-bold uppercase tracking-widest">인물 이름</label>
-                <input 
-                  value={charName} 
-                  onChange={(e) => setCharacterForm({ name: e.target.value })} 
-                  placeholder="예: 황시목" 
-                  className="w-full bg-zinc-900 border border-zinc-800 text-xs font-bold text-white px-4 py-2.5 rounded-xl outline-none focus:border-amber-500/50" 
-                />
-              </div>
-
-              <div className="flex flex-col gap-1.5">
-                <label className="text-[10px] text-amber-500 font-bold uppercase tracking-widest">배역 비중 및 포지션</label>
-                <select 
-                  value={charRole} 
-                  onChange={(e) => setCharacterForm({ role: e.target.value })} 
-                  className="w-full bg-zinc-900 border border-zinc-800 text-xs font-bold text-white px-3 py-2.5 rounded-xl outline-none"
-                >
-                  <option>주연 (검사)</option>
-                  <option>주연 (형사)</option>
-                  <option>조연 (법조인)</option>
-                  <option>조연 (정치인)</option>
-                  <option>조연 (기자)</option>
-                  <option>단역</option>
-                </select>
-              </div>
-
-              <div className="flex flex-col gap-1.5">
-                <label className="text-[10px] text-amber-500 font-bold uppercase tracking-widest">인물 내면의 근본 욕망 (Desire)</label>
-                <input 
-                  value={charDesire} 
-                  onChange={(e) => setCharacterForm({ desire: e.target.value })} 
-                  placeholder="예: 법 앞의 절대 평등과 사회 정의 실현" 
-                  className="w-full bg-zinc-900 border border-zinc-800 text-xs font-bold text-white px-4 py-2.5 rounded-xl outline-none focus:border-amber-500/50" 
-                />
-              </div>
-
-              <div className="flex flex-col gap-1.5">
-                <label className="text-[10px] text-amber-500 font-bold uppercase tracking-widest">인물 프로파일링 정보 기술</label>
-                <textarea 
-                  value={charDesc} 
-                  onChange={(e) => setCharacterForm({ desc: e.target.value })} 
-                  rows={3} 
-                  placeholder="인물의 주요 특징, 대인 관계에서의 특질 기술..." 
-                  className="w-full bg-zinc-900 border border-zinc-800 text-xs font-semibold text-white px-4 py-2.5 rounded-xl outline-none resize-none leading-relaxed focus:border-amber-500/50" 
-                />
-              </div>
-
-              <div className="flex flex-col gap-2">
-                <label className="text-[10px] text-amber-500 font-bold uppercase tracking-widest">인물 전용 다이어그램 식별 컬러</label>
-                <div className="flex gap-2.5">
-                  {[
-                    { label: "파랑", class: "bg-blue-500/20 text-blue-400 border-blue-500/50" },
-                    { label: "녹색", class: "bg-emerald-500/20 text-emerald-400 border-emerald-500/50" },
-                    { label: "보라", class: "bg-purple-500/20 text-purple-400 border-purple-500/50" },
-                    { label: "빨강", class: "bg-rose-500/20 text-rose-400 border-rose-500/50" }
-                  ].map(c => (
-                    <button
-                      key={c.class}
-                      onClick={() => setCharacterForm({ color: c.class })}
-                      className={cn(
-                        "flex-1 py-1.5 text-[10px] font-bold rounded-lg border transition-all",
-                        charColor === c.class ? "bg-amber-500 text-black border-amber-400" : "bg-zinc-800 text-zinc-400 border-zinc-700"
-                      )}
-                    >
-                      {c.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            <div className="p-6 border-t border-zinc-800/40 bg-[#0E0E12] flex justify-between gap-3">
-              {activeCharacterId && (
-                <button 
-                  onClick={async () => {
-                    await deleteCharacter(activeCharacterId);
-                    addToast("인물 프로필이 완벽히 삭제되었습니다.", "info");
-                    setModalOpen("character", false);
-                  }} 
-                  className="px-4 py-2 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 text-rose-400 text-xs font-bold rounded-xl transition-all"
-                >
-                  삭제
-                </button>
-              )}
-              <div className="flex gap-3 ml-auto">
-                <button onClick={() => setModalOpen("character", false)} className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-white text-xs font-bold rounded-xl transition-all">취소</button>
-                <button onClick={handleSaveCharacter} className="px-5 py-2.5 bg-amber-500 text-black hover:bg-amber-400 text-xs font-black rounded-xl transition-all shadow-md active:scale-95">저장</button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      <CharacterModal 
+        isOpen={isCharacterModalOpen}
+        onClose={() => setModalOpen("character", false)}
+        activeCharacterId={activeCharacterId}
+        charName={charName}
+        charRole={charRole}
+        charDesc={charDesc}
+        charDesire={charDesire}
+        charColor={charColor}
+        setCharacterForm={setCharacterForm}
+        handleSaveCharacter={handleSaveCharacter}
+        deleteCharacter={deleteCharacter}
+        addToast={addToast}
+      />
 
       {/* 실시간 알림 토스트 컨테이너 */}
-      <div className="fixed bottom-6 left-6 flex flex-col-reverse gap-3.5 z-[2000] pointer-events-none">
-        {toasts.map(toast => (
-          <div 
-            key={toast.id} 
-            className={cn(
-              "px-5 py-3.5 rounded-2xl shadow-2xl flex items-center gap-3.5 animate-in slide-in-from-left-10 duration-500 pointer-events-auto",
-              isDarkMode ? "bg-zinc-900 border border-zinc-800 text-white" : "bg-white border border-zinc-200 text-zinc-900"
-            )}
-          >
-            <span className="text-xs font-black">{toast.message}</span>
-            <button onClick={() => setToasts(prev => prev.filter(t => t.id !== toast.id))} className="text-[10px] text-zinc-500 hover:text-zinc-300 ml-2">닫기</button>
-          </div>
-        ))}
-      </div>
+      <ToastContainer 
+        toasts={toasts}
+        setToasts={setToasts}
+      />
 
     </div>
   );

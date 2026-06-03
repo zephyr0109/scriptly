@@ -82,13 +82,14 @@ export function useArchive() {
     }
   };
 
-  const handleReanalyze = async (sourceId: string, onSuccess?: () => void) => {
+  const handleReanalyze = async (sourceId: string, onSuccess?: () => void, onFailure?: (msg: string) => void) => {
     try {
       await api.post(`/archive/source/${sourceId}/reanalyze`);
       if (onSuccess) onSuccess(); 
       fetchArchiveItems(); 
-    } catch (e) { 
+    } catch (e: any) { 
       console.error('Failed to reanalyze:', e); 
+      if (onFailure) onFailure(e.response?.data?.detail || "AI 재분석 요청에 실패했습니다.");
     }
   };
 

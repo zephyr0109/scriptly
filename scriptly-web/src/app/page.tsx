@@ -73,6 +73,7 @@ export default function IntegratedPrototype() {
     
     // 캐릭터 폼 상태
     activeCharacterId, charName, charRole, charDesc, charDesire, charColor,
+    charAge, charGender, charOccupation,
     setCharacterForm, resetCharacterForm
   } = useUIStore();
 
@@ -143,7 +144,17 @@ export default function IntegratedPrototype() {
     fetchScripts,
     createScript,
     updateScript,
-    deleteScript
+    deleteScript,
+
+    // React Flow 캔버스 & 캐릭터 동기화 상태/핸들러 추가
+    nodes,
+    setNodes,
+    edges,
+    setEdges,
+    onNodesChange,
+    onEdgesChange,
+    syncCharacters,
+    handleSaveLabSession
   } = useInsightLab(isDarkMode);
 
   // 6. 하이드레이션 마운트가 완료되고 인증되지 않은 경우에만 강제 로그인 리다이렉트
@@ -514,10 +525,13 @@ export default function IntegratedPrototype() {
     setCharacterForm({
       id: char.id,
       name: char.name,
-      role: char.role || "주역",
+      role: char.role || "주연",
       desc: char.description || char.desc || "",
-      desire: char.desire || "",
-      color: char.color || "bg-blue-500/20 text-blue-400 border-blue-500/50"
+      desire: char.internal_desire || char.desire || "",
+      color: char.color || "bg-blue-500/20 text-blue-400 border-blue-500/50",
+      age: char.age || "",
+      gender: char.gender || "",
+      occupation: char.occupation || ""
     });
     setModalOpen("character", true);
   };
@@ -527,22 +541,29 @@ export default function IntegratedPrototype() {
       addToast("인물의 이름을 입력해주세요.", "error");
       return;
     }
+    
+    const payload = {
+      name: charName,
+      role: charRole,
+      description: charDesc,
+      internal_desire: charDesire,
+      color: charColor || "bg-blue-500/20 text-blue-400 border-blue-500/50",
+      age: charAge,
+      gender: charGender,
+      occupation: charOccupation
+    };
+
     if (activeCharacterId) {
-      await updateCharacter(activeCharacterId, {
-        name: charName,
-        role: charRole,
-        description: charDesc,
-        desire: charDesire,
-        color: charColor
-      });
+      await updateCharacter(activeCharacterId, payload);
       addToast(`인물 '${charName}'의 설정이 수정되었습니다.`, "success");
     } else {
+      if (!selectedProjectId) {
+        addToast("프로젝트가 선택되지 않았습니다.", "error");
+        return;
+      }
       await createCharacter({
-        name: charName,
-        role: charRole,
-        description: charDesc,
-        desire: charDesire,
-        color: charColor
+        ...payload,
+        project_id: selectedProjectId
       });
       addToast(`신규 인물 '${charName}'이(가) 등록되었습니다!`, "success");
     }
@@ -1304,16 +1325,20 @@ export default function IntegratedPrototype() {
 
               {activeWorkspaceTab === "characters" && (
                 <CharacterMapDualView 
-                  characters={characters.map(c => ({
-                    id: c.id,
-                    name: c.name,
-                    role: c.role || "조역",
-                    desc: c.description || "등장인물 정보 기술",
-                    desire: c.desire || "인물이 갈망하는 목표",
-                    color: c.color || "bg-emerald-500/20 text-emerald-400 border-emerald-500/50"
-                  }))} 
+                  characters={characters} 
                   handleOpenCharacterAdd={handleOpenCharacterAdd} 
                   handleOpenCharacterEdit={handleOpenCharacterEdit} 
+                  syncCharacters={syncCharacters}
+                  project={currentProject}
+                  isDarkMode={isDarkMode}
+                  nodes={nodes}
+                  setNodes={setNodes}
+                  onNodesChange={onNodesChange}
+                  edges={edges}
+                  setEdges={setEdges}
+                  onEdgesChange={onEdgesChange}
+                  handleSaveLabSession={handleSaveLabSession}
+                  addToast={addToast}
                 />
               )}
 
@@ -1535,6 +1560,9 @@ export default function IntegratedPrototype() {
         charDesc={charDesc}
         charDesire={charDesire}
         charColor={charColor}
+        charAge={charAge}
+        charGender={charGender}
+        charOccupation={charOccupation}
         setCharacterForm={setCharacterForm}
         handleSaveCharacter={handleSaveCharacter}
         deleteCharacter={deleteCharacter}

@@ -106,7 +106,7 @@ class AIService:
             logger.error(f"Error in analyze_batch: {e}", exc_info=True)
             raise HTTPException(status_code=500, detail="기사 분석 중 서버 오류가 발생했습니다.")
 
-    async def analyze_detail(self, title: str, content: str) -> dict:
+    async def analyze_detail(self, title: str, content: str, project_context: dict = None) -> dict:
         """기사/파일 상세 분석 (Quick Insight + World Building) 수행"""
         logger.info(f"Executing analyze_detail for title: {title[:30]}...")
         if not self.client:
@@ -114,6 +114,21 @@ class AIService:
 
         from app.application.services.prompt_templates import DETAILED_INSIGHT_PROMPT
         prompt = DETAILED_INSIGHT_PROMPT.format(title=title, content=content[:8000]) # 텍스트 제한 완화
+
+        if project_context:
+            project_info = f"\n\n[드라마 프로젝트 기획 정보]\n"
+            if project_context.get("title"): project_info += f"- 제목: {project_context['title']}\n"
+            if project_context.get("genre"): project_info += f"- 주요 장르: {project_context['genre']}\n"
+            if project_context.get("atmosphere"): project_info += f"- 분위기/톤: {project_context['atmosphere']}\n"
+            if project_context.get("intended_purpose"): project_info += f"- 기획의도: {project_context['intended_purpose']}\n"
+            if project_context.get("core_conflict"): project_info += f"- 핵심 갈등: {project_context['core_conflict']}\n"
+            if project_context.get("theme"): project_info += f"- 주제 및 인사이트: {project_context['theme']}\n"
+            
+            project_info += """
+위 드라마 프로젝트 기획 정보를 매우 심도 있게 참고하여 분석하십시오.
+특히 "people" 리스트의 캐릭터들을 추출할 때, 기사 속 인물을 그대로 옮기기보다는 위 드라마 기획안의 장르, 톤앤매너, 핵심 갈등에 잘 맞물리며 이 드라마 속에서 활약하거나 주인공과 대립할 수 있는 매력적이고 입체적인 캐릭터(성격, 직업, 직장, 역할, 내면의 근본 욕망 등)로 자연스럽게 드라마화(Adaptation)하여 변환/추출해 주십시오.
+"""
+            prompt += project_info
 
         try:
             response = await self._safe_generate_content(

@@ -33,7 +33,7 @@ export default function RelationshipEdge({
   selected
 }: EdgeProps) {
   const edgeData = data as RelationshipEdgeData;
-  const { setEdges } = useReactFlow();
+  const { setEdges, getZoom } = useReactFlow();
   
   // 드래그 관련 상태
   const [isDragging, setIsDragging] = useState(false);
@@ -64,8 +64,9 @@ export default function RelationshipEdge({
 
   const onMouseMove = useCallback((evt: MouseEvent) => {
     if (!isDragging) return;
-    const dx = evt.clientX - dragStart.current.x;
-    const dy = evt.clientY - dragStart.current.y;
+    const zoom = getZoom();
+    const dx = (evt.clientX - dragStart.current.x) / zoom;
+    const dy = (evt.clientY - dragStart.current.y) / zoom;
     
     if (Math.abs(dx) > 3 || Math.abs(dy) > 3) {
       movedRef.current = true;
@@ -75,7 +76,7 @@ export default function RelationshipEdge({
       x: (edgeData?.labelOffset?.x || 0) + dx,
       y: (edgeData?.labelOffset?.y || 0) + dy,
     });
-  }, [isDragging, edgeData?.labelOffset]);
+  }, [isDragging, edgeData?.labelOffset, getZoom]);
 
   const onMouseUp = useCallback(() => {
     if (isDragging) {
@@ -145,53 +146,36 @@ export default function RelationshipEdge({
         >
           <div 
             onMouseDown={onMouseDown}
+            title={edgeData?.description || edgeData?.label || "관계"}
             className={cn(
-              "group relative flex flex-col items-center justify-center min-w-[80px] px-3 py-1.5 rounded-lg border-2 transition-all shadow-md active:scale-95",
+              "group relative flex flex-col items-center justify-center w-[46px] h-[46px] rounded-full border-2 transition-all shadow-md active:scale-95 text-center p-1 select-none",
               isDragging ? "cursor-grabbing scale-105 border-indigo-500 ring-4 ring-indigo-500/20" : "cursor-pointer hover:scale-105",
               isDarkMode 
-                ? "bg-zinc-900 border-zinc-800" 
-                : "bg-white border-zinc-200 font-medium",
+                ? "bg-zinc-900 border-zinc-800 text-white" 
+                : "bg-white border-zinc-200 text-zinc-950 font-medium",
               selected && !isDragging && (isDarkMode ? "border-indigo-500 ring-2 ring-indigo-500/20" : "border-indigo-600 ring-2 ring-indigo-500/10")
             )}
           >
-            {/* Drag Handle Icon (Internal) */}
-            <div className="absolute -left-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity">
-               <Move size={10} className={isDarkMode ? "text-zinc-600" : "text-zinc-400"} />
-            </div>
-
             <span 
               onClick={onEdgeClick}
-              className={cn(
-                "text-[11px] font-black tracking-tight leading-none",
-                isDarkMode ? "text-zinc-100" : "text-zinc-900"
-              )}
+              className="text-[9px] font-black tracking-tighter leading-tight truncate w-full"
             >
               {edgeData?.label || "관계"}
             </span>
-            
-            {edgeData?.description && (
-              <span 
-                onClick={onEdgeClick}
-                className={cn(
-                  "text-[9px] font-bold mt-0.5 max-w-[120px] truncate",
-                  isDarkMode ? "text-zinc-500" : "text-zinc-400"
-                )}
-              >
-                {edgeData.description}
-              </span>
-            )}
 
             {/* Actions on Selection */}
             {selected && !isDragging && (
               <div className="absolute -top-3 -right-3 flex gap-1 animate-in zoom-in duration-200">
                 <button 
                   onClick={onRemoveClick}
+                  onMouseDown={(e) => e.stopPropagation()}
                   className="w-5 h-5 rounded-full bg-rose-500 text-white flex items-center justify-center shadow-lg hover:bg-rose-600 transition-all"
                 >
                   <X size={10} />
                 </button>
                 <button 
                   onClick={onEdgeClick}
+                  onMouseDown={(e) => e.stopPropagation()}
                   className="w-5 h-5 rounded-full bg-indigo-500 text-white flex items-center justify-center shadow-lg hover:bg-indigo-600 transition-all"
                 >
                   <MessageSquare size={10} />

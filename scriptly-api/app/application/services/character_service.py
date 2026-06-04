@@ -31,6 +31,22 @@ class CharacterService:
             if not source_ids:
                 return []
                 
+            # 1. 프로젝트 정보 조회 (AI Context 참고용)
+            project_stmt = select(ProjectModel).where(ProjectModel.id == project_id)
+            project_res = await db.execute(project_stmt)
+            project = project_res.scalar_one_or_none()
+            
+            project_context = None
+            if project:
+                project_context = {
+                    "title": project.title,
+                    "genre": project.genre,
+                    "atmosphere": project.atmosphere,
+                    "intended_purpose": project.intended_purpose,
+                    "core_conflict": project.core_conflict,
+                    "theme": project.theme
+                }
+                
             # 2. 소스들에서 캐릭터 정보(people) 추출
             stmt = select(SourceModel).where(SourceModel.id.in_(source_ids))
             result = await db.execute(stmt)
@@ -41,17 +57,47 @@ class CharacterService:
             existing_chars_res = await db.execute(existing_chars_stmt)
             existing_names = {c.name for c in existing_chars_res.scalars().all()}
             
+            from app.application.services.ai_service import AIService
+            ai_service = AIService()
+            
             new_chars = []
             for s in sources:
-                analysis = s.source_metadata.get("detailed_analysis", {})
-                people = analysis.get("people", [])
+                metadata = dict(s.source_metadata or {})
+                analysis = metadata.get("detailed_analysis")
                 
+                # 만약 상세 분석이 없거나 비어있는 경우 실시간 AI 분석 수행 (프로젝트 컨텍스트 주입)
+                if not analysis or (isinstance(analysis, dict) and not analysis.get("people")):
+                    try:
+                        logger.info(f"Source {s.id} has no detailed analysis or empty people list. Analyzing in real-time with project context...")
+                        content = s.content or s.title
+                        analysis = await ai_service.analyze_detail(s.title, content, project_context)
+                        metadata["detailed_analysis"] = analysis
+                        s.source_metadata = metadata
+                        s.tension_score = analysis.get("tension_score", 0)
+                        s.tension_reason = analysis.get("tension_reason", "분석 완료")
+                        s.analysis_status = "COMPLETED"
+                        db.add(s)
+                    except Exception as ae:
+                        logger.error(f"Realtime analysis failed for source {s.id}: {ae}", exc_info=True)
+                        analysis = {}
+                elif isinstance(analysis, str):
+                    try:
+                        import json
+                        analysis = json.loads(analysis)
+                    except Exception:
+                        analysis = {}
+                
+                if not isinstance(analysis, dict):
+                    analysis = {}
+
+                people = analysis.get("people", [])
                 for p in people:
                     name = p.get("name", "이름 없음")
                     if name not in existing_names:
                         char = CharacterModel(
                             project_id=project_id,
                             name=name,
+                            role="조연",  # AI 자동 동기화 인물은 기본적으로 '조연'으로 매핑
                             occupation=p.get("role", ""),
                             description=p.get("description", ""),
                             char_metadata={"source_id": str(s.id), "source_title": s.title}
@@ -60,7 +106,7 @@ class CharacterService:
                         new_chars.append(char)
                         existing_names.add(name)
             
-            if new_chars:
+            if new_chars or any(s in db.dirty for s in sources):
                 await db.commit()
                 for c in new_chars:
                     await db.refresh(c)

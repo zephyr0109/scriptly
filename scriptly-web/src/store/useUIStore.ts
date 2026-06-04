@@ -30,6 +30,9 @@ interface UIState {
   charDesc: string;
   charDesire: string;
   charColor: string;
+  charAge: string;
+  charGender: string;
+  charOccupation: string;
 
   // 6. 액션 함수
   setActivity: (activity: "inspiration" | "workspace") => void;
@@ -44,7 +47,7 @@ interface UIState {
   selectInspiration: (id: string | null) => void;
   selectArchive: (id: string | null) => void;
   setModalOpen: (modal: "collect" | "project" | "linkArchive" | "character", open: boolean) => void;
-  setCharacterForm: (form: Partial<{ id: string | null; name: string; role: string; desc: string; desire: string; color: string }>) => void;
+  setCharacterForm: (form: Partial<{ id: string | null; name: string; role: string; desc: string; desire: string; color: string; age: string; gender: string; occupation: string }>) => void;
   resetCharacterForm: () => void;
 }
 
@@ -70,10 +73,13 @@ export const useUIStore = create<UIState>((set) => ({
 
   activeCharacterId: null,
   charName: "",
-  charRole: "주연 (검사)",
+  charRole: "주연",
   charDesc: "",
   charDesire: "",
   charColor: "bg-blue-500/20 text-blue-400 border-blue-500/50",
+  charAge: "",
+  charGender: "",
+  charOccupation: "",
 
   // 2. 액션 구현
   setActivity: (activity) => set({ activeActivity: activity }),
@@ -101,13 +107,19 @@ export const useUIStore = create<UIState>((set) => ({
     charDesc: form.desc !== undefined ? form.desc : state.charDesc,
     charDesire: form.desire !== undefined ? form.desire : state.charDesire,
     charColor: form.color !== undefined ? form.color : state.charColor,
+    charAge: form.age !== undefined ? form.age : state.charAge,
+    charGender: form.gender !== undefined ? form.gender : state.charGender,
+    charOccupation: form.occupation !== undefined ? form.occupation : state.charOccupation,
   })),
   resetCharacterForm: () => set({
     activeCharacterId: null,
     charName: "",
-    charRole: "주연 (검사)",
+    charRole: "주연",
     charDesc: "",
     charDesire: "",
     charColor: "bg-blue-500/20 text-blue-400 border-blue-500/50",
+    charAge: "",
+    charGender: "",
+    charOccupation: "",
   }),
 }));

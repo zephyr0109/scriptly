@@ -15,8 +15,9 @@ interface RightInsightPanelProps {
   analyzedProjects: Record<string, any>;
   handleTriggerQuickAnalysis: (id: string, isFromArchive?: boolean) => void;
   linkedReferenceItems: any[];
-  projectLinkedInspirations: string[];
-  setProjectLinkedInspirations: React.Dispatch<React.SetStateAction<string[]>>;
+  projects: any[];
+  onOpenLinkProjectModal?: (inspiration: any) => void;
+  onRemoveReference?: (id: string) => void;
   handleSaveToArchive?: () => void;
   isSaving?: boolean;
   addToast: (msg: string, type?: "success" | "info" | "warning" | "error") => void;
@@ -28,8 +29,9 @@ export default function RightInsightPanel({
   analyzedProjects,
   handleTriggerQuickAnalysis,
   linkedReferenceItems,
-  projectLinkedInspirations,
-  setProjectLinkedInspirations,
+  projects,
+  onOpenLinkProjectModal,
+  onRemoveReference,
   handleSaveToArchive,
   isSaving,
   addToast
@@ -46,6 +48,13 @@ export default function RightInsightPanel({
 
   const [openReferenceAccordionId, setOpenReferenceAccordionId] = useState<string | null>("insp_1");
   const [isResizing, setIsResizing] = useState(false);
+
+  const getLinkedProjects = () => {
+    if (!currentInspiration || !projects) return [];
+    return projects.filter(
+      (proj) => proj.linked_sources && proj.linked_sources.includes(currentInspiration.id)
+    );
+  };
 
   React.useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
@@ -251,6 +260,30 @@ export default function RightInsightPanel({
                 {!isAnalyzingQuick && analyzedProjects[currentInspiration.id] && (
                   <div className="flex flex-col gap-6 animate-in fade-in duration-500">
                     
+                    {/* 연결된 기획안(프로젝트) 뱃지 목록 */}
+                    <div className="flex flex-col gap-2">
+                      <span className="text-[10px] font-black text-zinc-500 uppercase tracking-widest flex items-center gap-1.5">
+                        <BookmarkCheck size={12} className="text-amber-400" />
+                        연결된 기획안
+                      </span>
+                      <div className="flex flex-wrap gap-1.5">
+                        {getLinkedProjects().length > 0 ? (
+                          getLinkedProjects().map(proj => (
+                            <span 
+                              key={proj.id} 
+                              className="text-[9px] bg-[#fbbf24]/10 border border-[#fbbf24]/20 text-[#fbbf24] font-bold px-2 py-0.5 rounded"
+                            >
+                              {proj.title}
+                            </span>
+                          ))
+                        ) : (
+                          <span className="text-[9px] text-zinc-500 font-bold italic">
+                            연결된 기획안이 없습니다.
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
                     {/* A. Dramatic Tension 지수 게이지 */}
                     <div className={cn(
                       "p-4 rounded-xl border flex flex-col gap-3",
@@ -391,28 +424,17 @@ export default function RightInsightPanel({
                   )}
                   
                   {inspirationSubTab === "archive" ? (
-                    projectLinkedInspirations.includes(currentInspiration.id) ? (
-                      <button 
-                        onClick={() => {
-                          setProjectLinkedInspirations(prev => prev.filter(id => id !== currentInspiration.id));
-                          addToast("프로젝트 연동을 해제했습니다. (프리뷰 프로토타입)", "info");
-                        }}
-                        className="flex-1 py-2.5 bg-amber-500 text-black text-[11px] font-black rounded-lg transition-all text-center flex items-center justify-center gap-1.5 shadow-sm active:scale-95 cursor-pointer"
-                      >
-                        <Check size={12} />
-                        프로젝트 연결됨
-                      </button>
-                    ) : (
-                      <button 
-                        onClick={() => {
-                          setProjectLinkedInspirations(prev => [...prev, currentInspiration.id]);
-                          addToast("프로젝트에 참고 영감으로 연결했습니다! (프리뷰 프로토타입)", "success");
-                        }}
-                        className="flex-1 py-2.5 bg-zinc-800 border border-zinc-700 text-zinc-300 hover:bg-zinc-700 text-[11px] font-bold rounded-lg transition-all text-center flex items-center justify-center gap-1.5 shadow-sm active:scale-95 cursor-pointer"
-                      >
-                        프로젝트 연결
-                      </button>
-                    )
+                    <button 
+                      onClick={() => {
+                        if (onOpenLinkProjectModal) {
+                          onOpenLinkProjectModal(currentInspiration);
+                        }
+                      }}
+                      className="flex-1 py-2.5 bg-zinc-800 border border-zinc-700 text-zinc-300 hover:bg-zinc-750 hover:text-white text-[11px] font-black rounded-lg transition-all text-center flex items-center justify-center gap-1.5 shadow-sm active:scale-95 cursor-pointer"
+                    >
+                      <BookmarkCheck size={12} />
+                      <span>기획안 연결 관리</span>
+                    </button>
                   ) : (
                     handleSaveToArchive && (
                       <button 
@@ -486,8 +508,9 @@ export default function RightInsightPanel({
                         <span className="text-amber-500 flex items-center gap-1">✨ {item.vibe}</span>
                         <button 
                           onClick={() => {
-                            setProjectLinkedInspirations(prev => prev.filter(id => id !== item.id));
-                            addToast("참고 책장에서 자료를 언링크 해제했습니다.", "info");
+                            if (onRemoveReference) {
+                              onRemoveReference(item.id);
+                            }
                           }}
                           className="text-[9px] text-rose-400 hover:underline"
                         >

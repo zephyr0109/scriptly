@@ -77,6 +77,17 @@ export function useInsightLab(isDarkMode: boolean) {
     return null;
   }, [currentProject?.id]);
 
+  const deleteProject = useCallback(async (projectId: string) => {
+    try {
+      await api.delete(`/projects/${projectId}`);
+      setProjects(prev => prev.filter(p => p.id !== projectId));
+      return true;
+    } catch (e) {
+      console.error('Failed to delete project:', e);
+    }
+    return false;
+  }, []);
+
   const selectProject = useCallback(async (project: any) => {
     setCurrentProject(project);
     setNodes([]); 
@@ -517,9 +528,9 @@ export function useInsightLab(isDarkMode: boolean) {
   }, [currentScript?.id]);
 
   return {
-    projects, currentProject, isLoadingProjects, characters, labSources, nodes: enrichedNodes, setNodes, edges, setEdges,
+    projects, setProjects, currentProject, isLoadingProjects, characters, labSources, nodes: enrichedNodes, setNodes, edges, setEdges,
     events, isGeneratingPlot,
-    fetchProjects, createProject, selectProject, updateProject, fetchCharacters, createCharacter, updateCharacter, deleteCharacter, syncCharacters,
+    fetchProjects, createProject, selectProject, updateProject, deleteProject, fetchCharacters, createCharacter, updateCharacter, deleteCharacter, syncCharacters,
     fetchEvents, createEvent, updateEvent, deleteEvent, reorderEvents, generatePlotDraft,
     generateLogline, generateSynopsis, exportProject,
     handleSendToLab, handleMoveToLab, handleSynthesizeOnDemand, handleExtract, handleImportSources, handleRemoveLabSource,

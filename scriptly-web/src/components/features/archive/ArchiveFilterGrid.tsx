@@ -7,8 +7,6 @@ import { useUIStore } from "@/store/useUIStore";
  
 interface ArchiveFilterGridProps {
   filteredAndSortedArchives: any[];
-  projectLinkedInspirations: string[];
-  setProjectLinkedInspirations: React.Dispatch<React.SetStateAction<string[]>>;
   addToast: (msg: string, type?: "success" | "info" | "warning" | "error") => void;
   selectArchive?: (id: string) => void;
   onEditClick?: (item: any) => void;
@@ -17,8 +15,6 @@ interface ArchiveFilterGridProps {
  
 export default function ArchiveFilterGrid({
   filteredAndSortedArchives,
-  projectLinkedInspirations,
-  setProjectLinkedInspirations,
   addToast,
   selectArchive,
   onEditClick,
@@ -109,39 +105,12 @@ export default function ArchiveFilterGrid({
               {item.desc}
             </p>
             
-            <div className="flex items-center justify-between border-t border-zinc-800/10 pt-3">
+            <div className="flex items-center pt-3 border-t border-zinc-800/10">
               <span className="text-[10px] text-zinc-500 font-bold">
                 {item.analysis_status === "COMPLETED" && item.tension_score > 0
                   ? `갈등 지수: ${item.tension_score}%`
                   : ""}
               </span>
-              
-              {/* 프로젝트 연결(Link) 및 연결해제 동적 처리 */}
-              {projectLinkedInspirations.includes(item.id) ? (
-                <button 
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setProjectLinkedInspirations(prev => prev.filter(id => id !== item.id));
-                    addToast("현재 프로젝트 연결을 해제했습니다.", "info");
-                  }}
-                  className="text-[10px] bg-amber-500/15 border border-amber-500/30 text-amber-400 px-2 py-1 rounded font-bold transition-all flex items-center gap-1"
-                >
-                  <Check size={10} />
-                  연결됨
-                </button>
-              ) : (
-                <button 
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setProjectLinkedInspirations(prev => [...prev, item.id]);
-                    addToast("현재 드라마 프로젝트에 참고 자료로 연결(Link)했습니다!", "success");
-                  }}
-                  className="text-[10px] bg-zinc-800 hover:bg-zinc-700 text-zinc-300 px-2 py-1 rounded font-bold transition-all flex items-center gap-1"
-                >
-                  <FolderPlus size={10} />
-                  프로젝트 연결
-                </button>
-              )}
             </div>
           </div>
         ))}

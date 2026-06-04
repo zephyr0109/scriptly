@@ -24,6 +24,7 @@ import CollectModal from "@/components/features/modals/CollectModal";
 import ProjectCreateModal from "@/components/features/modals/ProjectCreateModal";
 import LinkArchiveModal from "@/components/features/modals/LinkArchiveModal";
 import CharacterModal from "@/components/features/modals/CharacterModal";
+import LinkInspirationProjectModal from "@/components/features/modals/LinkInspirationProjectModal";
 import ToastContainer from "@/components/layout/ToastContainer";
 
 // 커스텀 훅 및 상태 관리 저장소 임포트
@@ -108,12 +109,14 @@ export default function IntegratedPrototype() {
   // 5. 연구소(Insight Lab) 실 데이터 Custom Hook 연동
   const {
     projects,
+    setProjects,
     currentProject,
     isLoadingProjects,
     fetchProjects,
     createProject,
     selectProject: hookSelectProject,
     updateProject,
+    deleteProject,
     fetchCharacters,
     createCharacter,
     updateCharacter,
@@ -241,6 +244,172 @@ export default function IntegratedPrototype() {
   }, [archiveItems, addToast]);
   // 사이드바 리사이즈 제어
   const [isResizingSidebar, setIsResizingSidebar] = useState<boolean>(false);
+  
+  // 프로젝트 참고 책장에 연결할 리스트 상태 (실제 백엔드 동기화와 병합 연동)
+  const [projectLinkedInspirations, setProjectLinkedInspirations] = useState<string[]>([]);
+  
+  // 프로젝트 정보 수정 전용 로컬 상태 (Controlled Input 타이핑 렉 원천 해결)
+  const [editProjectTitle, setEditProjectTitle] = useState("");
+  const [editProjectGenre, setEditProjectGenre] = useState("");
+  const [formatSelectMode, setFormatSelectMode] = useState("16부작 미니시리즈");
+  const [customFormat, setCustomFormat] = useState("");
+  const [editProjectAtmosphere, setEditProjectAtmosphere] = useState("");
+  const [editProjectIntendedPurpose, setEditProjectIntendedPurpose] = useState("");
+  const [editProjectCoreConflict, setEditProjectCoreConflict] = useState("");
+  const [editProjectTheme, setEditProjectTheme] = useState("");
+  const [editProjectLogline, setEditProjectLogline] = useState("");
+
+  const [isProjectManageModalOpen, setIsProjectManageModalOpen] = useState(false);
+  const [isLinkInspirationProjectModalOpen, setIsLinkInspirationProjectModalOpen] = useState(false);
+  const [activeInspirationForLink, setActiveInspirationForLink] = useState<any>(null);
+
+  const handleOpenLinkInspirationProjectModal = useCallback((inspiration: any) => {
+    setActiveInspirationForLink(inspiration);
+    setIsLinkInspirationProjectModalOpen(true);
+  }, []);
+
+  const handleSaveInspirationProjectLinks = useCallback(async (inspirationId: string, selectedProjectIds: string[]) => {
+    try {
+      const updatePromises = projects.map(async (proj) => {
+        const linkedSources = proj.linked_sources || [];
+        const isCurrentlyLinked = linkedSources.includes(inspirationId);
+        const shouldBeLinked = selectedProjectIds.includes(proj.id);
+
+        if (shouldBeLinked && !isCurrentlyLinked) {
+          const nextSources = [...linkedSources, inspirationId];
+          return updateProject(proj.id, { linked_sources: nextSources });
+        } else if (!shouldBeLinked && isCurrentlyLinked) {
+          const nextSources = linkedSources.filter((id: string) => id !== inspirationId);
+          return updateProject(proj.id, { linked_sources: nextSources });
+        }
+        return null;
+      });
+
+      await Promise.all(updatePromises);
+      await fetchProjects();
+    } catch (e) {
+      console.error("Failed to batch update inspiration project links:", e);
+      throw e;
+    }
+  }, [projects, updateProject, fetchProjects]);
+
+  // 활성 프로젝트 변경 시 정보 로컬 상태 및 연결 영감 목록 동기화
+  useEffect(() => {
+    if (currentProject) {
+      setEditProjectTitle(currentProject.title || "");
+      setEditProjectGenre(currentProject.genre || "");
+      
+      const currentFormat = currentProject.format || "";
+      const standardFormats = [
+        "단막극 (1부작)",
+        "2부작 단막극",
+        "4부작 연작",
+        "8부작 시리즈",
+        "12부작 미니시리즈",
+        "16부작 미니시리즈",
+        "영화 (Feature)"
+      ];
+      if (standardFormats.includes(currentFormat)) {
+        setFormatSelectMode(currentFormat);
+        setCustomFormat("");
+      } else if (currentFormat === "") {
+        setFormatSelectMode("16부작 미니시리즈");
+        setCustomFormat("");
+      } else {
+        setFormatSelectMode("custom");
+        setCustomFormat(currentFormat);
+      }
+
+      setEditProjectAtmosphere(currentProject.atmosphere || "");
+      setEditProjectIntendedPurpose(currentProject.intended_purpose || "");
+      setEditProjectCoreConflict(currentProject.core_conflict || "");
+      setEditProjectTheme(currentProject.theme || "");
+      setEditProjectLogline(currentProject.logline || "");
+      setProjectLinkedInspirations(currentProject.linked_sources || []);
+    } else {
+      setEditProjectTitle("");
+      setEditProjectGenre("");
+      setFormatSelectMode("16부작 미니시리즈");
+      setCustomFormat("");
+      setEditProjectAtmosphere("");
+      setEditProjectIntendedPurpose("");
+      setEditProjectCoreConflict("");
+      setEditProjectTheme("");
+      setEditProjectLogline("");
+      setProjectLinkedInspirations([]);
+    }
+  }, [currentProject]);
+
+  // 기획 저장 단추 클릭 시 일괄 업데이트 핸들러
+  const handleSaveProjectInfo = useCallback(async () => {
+    if (!currentProject) return;
+    if (!editProjectTitle.trim()) {
+      addToast("기획 제목은 필수 항목입니다.", "warning");
+      return;
+    }
+    
+    const finalFormat = formatSelectMode === "custom" ? customFormat : formatSelectMode;
+    
+    try {
+      await updateProject(currentProject.id, {
+        title: editProjectTitle,
+        genre: editProjectGenre,
+        format: finalFormat,
+        atmosphere: editProjectAtmosphere,
+        intended_purpose: editProjectIntendedPurpose,
+        core_conflict: editProjectCoreConflict,
+        theme: editProjectTheme,
+        logline: editProjectLogline
+      });
+      addToast("기획 정보가 저장되었습니다.", "success");
+      await fetchProjects();
+    } catch (e) {
+      addToast("기획 저장에 실패했습니다.", "error");
+    }
+  }, [currentProject, editProjectTitle, editProjectGenre, formatSelectMode, customFormat, editProjectAtmosphere, editProjectIntendedPurpose, editProjectCoreConflict, editProjectTheme, editProjectLogline, updateProject, fetchProjects, addToast]);
+
+  // 영감 연결/해제 토글 핸들러 (백엔드 linked_sources 동기화)
+  const handleToggleLinkInspiration = useCallback(async (inspirationId: string, shouldLink: boolean) => {
+    if (!currentProject) {
+      addToast("연결할 활성화 프로젝트가 없습니다.", "warning");
+      return;
+    }
+    
+    let nextIds = [...projectLinkedInspirations];
+    if (shouldLink) {
+      if (!nextIds.includes(inspirationId)) nextIds.push(inspirationId);
+    } else {
+      nextIds = nextIds.filter(id => id !== inspirationId);
+    }
+    
+    try {
+      await updateProject(currentProject.id, { linked_sources: nextIds });
+      setProjectLinkedInspirations(nextIds);
+      addToast(shouldLink ? "프로젝트에 연결되었습니다." : "연결이 해제되었습니다.", "success");
+      await fetchProjects();
+    } catch (e) {
+      addToast("연결 처리에 실패했습니다.", "error");
+    }
+  }, [currentProject, projectLinkedInspirations, updateProject, fetchProjects, addToast]);
+
+  // 기존 컴포넌트 프롭스 호환을 위한 상태 래퍼 오버라이드
+  const setProjectLinkedInspirationsWrapper = useCallback((valOrFunc: any) => {
+    if (typeof valOrFunc === "function") {
+      setProjectLinkedInspirations(prev => {
+        const next = valOrFunc(prev);
+        const added = next.filter((x: string) => !prev.includes(x));
+        const removed = prev.filter((x: string) => !next.includes(x));
+        if (added.length > 0) {
+          handleToggleLinkInspiration(added[0], true);
+        } else if (removed.length > 0) {
+          handleToggleLinkInspiration(removed[0], false);
+        }
+        return next;
+      });
+    } else {
+      setProjectLinkedInspirations(valOrFunc);
+    }
+  }, [projectLinkedInspirations, handleToggleLinkInspiration]);
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
       if (isResizingSidebar) {
@@ -260,9 +429,6 @@ export default function IntegratedPrototype() {
   }, [isResizingSidebar, setSidebarWidth]);
 
 
-
-  // 프로젝트 참고 책장에 연결할 리스트 상태 (시뮬레이션)
-  const [projectLinkedInspirations, setProjectLinkedInspirations] = useState<string[]>([]);
 
   // 최근 검색어 (쿠키 기반 최근 5개 유지, 초기값 추천 태그 탑재)
   const [recentQueries, setRecentQueries] = useState<string[]>(["비자금", "납치", "딥페이크", "로비"]);
@@ -796,13 +962,22 @@ export default function IntegratedPrototype() {
             <div className="p-5 border-b border-zinc-800/20 flex flex-col gap-3 shrink-0">
               <div className="flex items-center justify-between">
                 <span className="text-[10px] font-black tracking-wider uppercase text-zinc-500">ACTIVE WORKSPACE</span>
-                <button 
-                  onClick={() => setModalOpen("project", true)}
-                  className="p-1.5 hover:bg-zinc-800 rounded text-amber-500 hover:text-amber-400 transition-all"
-                  title="신규 드라마 프로젝트 기획"
-                >
-                  <Plus size={16} />
-                </button>
+                <div className="flex items-center gap-1">
+                  <button 
+                    onClick={() => setIsProjectManageModalOpen(true)}
+                    className="p-1.5 hover:bg-zinc-800 rounded text-zinc-400 hover:text-white transition-all"
+                    title="드라마 프로젝트 관리 (삭제/순서조정)"
+                  >
+                    <Settings size={14} />
+                  </button>
+                  <button 
+                    onClick={() => setModalOpen("project", true)}
+                    className="p-1.5 hover:bg-zinc-800 rounded text-amber-500 hover:text-amber-400 transition-all"
+                    title="신규 드라마 프로젝트 기획"
+                  >
+                    <Plus size={16} />
+                  </button>
+                </div>
               </div>
               <div className="relative">
                 <select 
@@ -983,8 +1158,6 @@ export default function IntegratedPrototype() {
                       analysis_status: item.analysis_status,
                       date: new Date(item.ingested_at || item.created_at).toISOString().split("T")[0]
                     }))} 
-                    projectLinkedInspirations={projectLinkedInspirations}
-                    setProjectLinkedInspirations={setProjectLinkedInspirations}
                     addToast={addToast}
                     selectArchive={(id) => {
                       selectArchive(id);
@@ -1024,12 +1197,8 @@ export default function IntegratedPrototype() {
                     <div className="flex flex-col gap-1.5">
                       <span className="text-[10px] font-black text-amber-500 uppercase tracking-widest">기획 타이틀</span>
                       <input 
-                        value={currentProject?.title || ""} 
-                        onChange={async (e) => {
-                          if (currentProject) {
-                            await updateProject(currentProject.id, { title: e.target.value });
-                          }
-                        }}
+                        value={editProjectTitle} 
+                        onChange={(e) => setEditProjectTitle(e.target.value)}
                         className="bg-zinc-900 border border-zinc-800 text-xs font-bold text-white px-4 py-2.5 rounded-xl w-full focus:border-amber-500/50 outline-none" 
                       />
                     </div>
@@ -1038,37 +1207,96 @@ export default function IntegratedPrototype() {
                       <div className="flex flex-col gap-1.5">
                         <span className="text-[10px] font-black text-amber-500 uppercase tracking-widest">장르 스타일</span>
                         <input 
-                          value={currentProject?.genre || ""} 
-                          onChange={async (e) => {
-                            if (currentProject) {
-                              await updateProject(currentProject.id, { genre: e.target.value });
-                            }
-                          }}
+                          value={editProjectGenre} 
+                          onChange={(e) => setEditProjectGenre(e.target.value)}
                           className="bg-zinc-900 border border-zinc-800 text-xs font-bold text-white px-4 py-2.5 rounded-xl w-full focus:border-amber-500/50 outline-none" 
                         />
                       </div>
                       <div className="flex flex-col gap-1.5">
                         <span className="text-[10px] font-black text-amber-500 uppercase tracking-widest">기본 편성 정보</span>
-                        <div className="bg-zinc-900/50 border border-zinc-800 text-xs font-bold text-zinc-400 px-4 py-2.5 rounded-xl">드라마 16부작 미니시리즈</div>
+                        <div className="flex flex-col gap-2">
+                          <select 
+                            value={formatSelectMode} 
+                            onChange={(e) => setFormatSelectMode(e.target.value)}
+                            className="bg-zinc-900 border border-zinc-800 text-xs font-bold text-white px-4 py-2.5 rounded-xl w-full focus:border-amber-500/50 outline-none cursor-pointer"
+                          >
+                            <option value="단막극 (1부작)">단막극 (1부작)</option>
+                            <option value="2부작 단막극">2부작 단막극</option>
+                            <option value="4부작 연작">4부작 연작</option>
+                            <option value="8부작 시리즈">8부작 시리즈</option>
+                            <option value="12부작 미니시리즈">12부작 미니시리즈</option>
+                            <option value="16부작 미니시리즈">16부작 미니시리즈</option>
+                            <option value="영화 (Feature)">영화 (Feature)</option>
+                            <option value="custom">직접 입력 (커스텀)</option>
+                          </select>
+                          
+                          {formatSelectMode === "custom" && (
+                            <input 
+                              value={customFormat} 
+                              onChange={(e) => setCustomFormat(e.target.value)}
+                              placeholder="원하는 편성 규격을 입력해 주세요... (예: 50부작 대하드라마)"
+                              className="bg-zinc-900 border border-zinc-800 text-xs font-bold text-white px-4 py-2.5 rounded-xl w-full focus:border-amber-500/50 outline-none animate-in slide-in-from-top-1 duration-200" 
+                            />
+                          )}
+                        </div>
                       </div>
+                    </div>
+
+                    <div className="flex flex-col gap-1.5">
+                      <span className="text-[10px] font-black text-amber-500 uppercase tracking-widest">분위기 / 톤 (Atmosphere)</span>
+                      <input 
+                        value={editProjectAtmosphere} 
+                        onChange={(e) => setEditProjectAtmosphere(e.target.value)}
+                        placeholder="예: 차갑고 묵직한 하드보일드 수사극, 빠른 템포의 오피스 누아르 등"
+                        className="bg-zinc-900 border border-zinc-800 text-xs font-bold text-white px-4 py-2.5 rounded-xl w-full focus:border-amber-500/50 outline-none" 
+                      />
+                    </div>
+
+                    <div className="flex flex-col gap-1.5">
+                      <span className="text-[10px] font-black text-amber-500 uppercase tracking-widest">작품의 기획 의도 (Intended Purpose)</span>
+                      <textarea 
+                        value={editProjectIntendedPurpose} 
+                        rows={4}
+                        onChange={(e) => setEditProjectIntendedPurpose(e.target.value)}
+                        placeholder="작품의 사회적 메시지, 집필 배경 및 기획 의도를 기술해 주세요..."
+                        className="bg-zinc-900 border border-zinc-800 text-xs font-semibold text-white px-4 py-3 rounded-xl w-full resize-none leading-relaxed focus:border-amber-500/50 outline-none" 
+                      />
+                    </div>
+
+                    <div className="flex flex-col gap-1.5">
+                      <span className="text-[10px] font-black text-amber-500 uppercase tracking-widest">핵심 갈등 역학 (Core Conflict)</span>
+                      <textarea 
+                        value={editProjectCoreConflict} 
+                        rows={3}
+                        onChange={(e) => setEditProjectCoreConflict(e.target.value)}
+                        placeholder="인물 간의 신념 대립이나 거대 세력과의 대립 구조 등 서사의 뼈대가 될 갈등 역학을 적어보세요..."
+                        className="bg-zinc-900 border border-zinc-800 text-xs font-semibold text-white px-4 py-3 rounded-xl w-full resize-none leading-relaxed focus:border-amber-500/50 outline-none" 
+                      />
+                    </div>
+
+                    <div className="flex flex-col gap-1.5">
+                      <span className="text-[10px] font-black text-amber-500 uppercase tracking-widest">주제 및 인사이트 (Theme)</span>
+                      <textarea 
+                        value={editProjectTheme} 
+                        rows={2}
+                        onChange={(e) => setEditProjectTheme(e.target.value)}
+                        placeholder="작품이 궁극적으로 전달하고자 하는 핵심 주제와 인간상에 대한 인사이트를 기록합니다..."
+                        className="bg-zinc-900 border border-zinc-800 text-xs font-semibold text-white px-4 py-3 rounded-xl w-full resize-none leading-relaxed focus:border-amber-500/50 outline-none" 
+                      />
                     </div>
 
                     <div className="flex flex-col gap-1.5">
                       <span className="text-[10px] font-black text-amber-500 uppercase tracking-widest">작품의 핵심 로그라인 (Logline)</span>
                       <textarea 
-                        value={currentProject?.logline || ""} 
+                        value={editProjectLogline} 
                         rows={4}
-                        onChange={async (e) => {
-                          if (currentProject) {
-                            await updateProject(currentProject.id, { logline: e.target.value });
-                          }
-                        }}
+                        onChange={(e) => setEditProjectLogline(e.target.value)}
                         className="bg-zinc-900 border border-zinc-800 text-xs font-semibold text-white px-4 py-3 rounded-xl w-full resize-none leading-relaxed focus:border-amber-500/50 outline-none" 
                       />
                     </div>
 
                     <div className="flex justify-end mt-2">
-                      <button onClick={() => addToast("작품 기획 정보가 완벽히 저장되었습니다.", "success")} className="px-5 py-2.5 bg-amber-500 text-black hover:bg-amber-400 text-xs font-black rounded-xl transition-all shadow-md active:scale-95">기획 저장 완료</button>
+                      <button onClick={handleSaveProjectInfo} className="px-5 py-2.5 bg-amber-500 text-black hover:bg-amber-400 text-xs font-black rounded-xl transition-all shadow-md active:scale-95">기획 저장 완료</button>
                     </div>
                   </div>
                 </div>
@@ -1170,8 +1398,9 @@ export default function IntegratedPrototype() {
         analyzedProjects={analyzedProjectsMap}
         handleTriggerQuickAnalysis={handleTriggerQuickAnalysis}
         linkedReferenceItems={linkedReferenceItems}
-        projectLinkedInspirations={projectLinkedInspirations}
-        setProjectLinkedInspirations={setProjectLinkedInspirations}
+        projects={projects}
+        onOpenLinkProjectModal={handleOpenLinkInspirationProjectModal}
+        onRemoveReference={(id) => handleToggleLinkInspiration(id, false)}
         handleSaveToArchive={() => handleSaveToArchive(() => addToast("수집 기사가 영감 보관함에 복사 완료되었습니다.", "success"), (msg) => addToast(msg, "error"))}
         isSaving={isSaving}
         addToast={addToast}
@@ -1292,7 +1521,7 @@ export default function IntegratedPrototype() {
         onClose={() => setModalOpen("linkArchive", false)}
         archiveItems={archiveItems}
         projectLinkedInspirations={projectLinkedInspirations}
-        setProjectLinkedInspirations={setProjectLinkedInspirations}
+        setProjectLinkedInspirations={setProjectLinkedInspirationsWrapper}
         addToast={addToast}
       />
 
@@ -1311,6 +1540,130 @@ export default function IntegratedPrototype() {
         deleteCharacter={deleteCharacter}
         addToast={addToast}
       />
+
+      {/* 6. 영감-프로젝트 다중 연결 설정 모달 (신설) */}
+      <LinkInspirationProjectModal 
+        isOpen={isLinkInspirationProjectModalOpen}
+        onClose={() => {
+          setIsLinkInspirationProjectModalOpen(false);
+          setActiveInspirationForLink(null);
+        }}
+        inspiration={activeInspirationForLink}
+        projects={projects}
+        onSave={handleSaveInspirationProjectLinks}
+        addToast={addToast}
+      />
+
+      {/* 5. 프로젝트 관리 및 순서제어 모달 (신설) */}
+      {isProjectManageModalOpen && (
+        <div className="fixed inset-0 bg-black/85 flex items-center justify-center z-[1000] p-4 animate-in fade-in duration-300">
+          <div className="bg-[#14141A] border border-zinc-800 rounded-3xl w-full max-w-xl overflow-hidden flex flex-col shadow-2xl">
+            <div className="p-6 border-b border-zinc-800/40 flex items-center justify-between">
+              <div className="flex flex-col gap-1">
+                <h3 className="text-sm font-black text-white">⚙️ 드라마 프로젝트 기획안 관리</h3>
+                <span className="text-[10px] text-zinc-500">생성된 기획안들의 우선순위 배열(순서)을 조정하거나 삭제합니다.</span>
+              </div>
+              <button 
+                onClick={() => setIsProjectManageModalOpen(false)} 
+                className="p-2 hover:bg-zinc-800 rounded-xl text-zinc-500 hover:text-white transition-all"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="p-6 flex flex-col gap-4 bg-[#0A0A0E]/30 max-h-[350px] overflow-y-auto custom-scrollbar-dark">
+              {projects.length > 0 ? (
+                projects.map((proj, idx) => (
+                  <div 
+                    key={proj.id}
+                    className={cn(
+                      "p-4.5 rounded-2xl border flex items-center justify-between transition-all",
+                      selectedProjectId === proj.id 
+                        ? "bg-[#1E1E28]/60 border-amber-500/40"
+                        : "bg-zinc-900/40 border-zinc-800/80 hover:border-zinc-700"
+                    )}
+                  >
+                    <div className="flex items-center gap-3.5">
+                      {/* 순서 조정 버튼 (화살표) */}
+                      <div className="flex flex-col gap-1">
+                        <button 
+                          disabled={idx === 0}
+                          onClick={() => {
+                            const next = [...projects];
+                            const temp = next[idx];
+                            next[idx] = next[idx - 1];
+                            next[idx - 1] = temp;
+                            setProjects(next);
+                            addToast("기획안 우선순위 배열이 조정되었습니다.", "success");
+                          }}
+                          className="p-0.5 hover:bg-zinc-800 rounded text-zinc-500 hover:text-zinc-200 disabled:opacity-30 disabled:hover:bg-transparent"
+                        >
+                          <ChevronDown size={14} className="rotate-180" />
+                        </button>
+                        <button 
+                          disabled={idx === projects.length - 1}
+                          onClick={() => {
+                            const next = [...projects];
+                            const temp = next[idx];
+                            next[idx] = next[idx + 1];
+                            next[idx + 1] = temp;
+                            setProjects(next);
+                            addToast("기획안 우선순위 배열이 조정되었습니다.", "success");
+                          }}
+                          className="p-0.5 hover:bg-zinc-800 rounded text-zinc-500 hover:text-zinc-200 disabled:opacity-30 disabled:hover:bg-transparent"
+                        >
+                          <ChevronDown size={14} />
+                        </button>
+                      </div>
+                      
+                      <div className="flex flex-col gap-1">
+                        <span className="text-xs font-black text-white">{proj.title}</span>
+                        <span className="text-[9px] text-zinc-500 font-bold uppercase tracking-wider">{proj.genre || "장르 미설정"} • {proj.format || "16부작 미니시리즈"}</span>
+                      </div>
+                    </div>
+
+                    <button 
+                      onClick={async () => {
+                        if (confirm(`정말 이 프로젝트('${proj.title}')를 영구 삭제하시겠습니까?\n하위 대본, 인물 설정 등 기획된 모든 서사 데이터가 영구 삭제됩니다.`)) {
+                          const success = await deleteProject(proj.id);
+                          if (success) {
+                            addToast("드라마 프로젝트가 영구 삭제되었습니다.", "success");
+                            if (selectedProjectId === proj.id) {
+                              const remaining = projects.filter(p => p.id !== proj.id);
+                              if (remaining.length > 0) {
+                                selectProject(remaining[0].id);
+                              } else {
+                                selectProject("");
+                              }
+                            }
+                          } else {
+                            addToast("프로젝트 삭제에 실패했습니다.", "error");
+                          }
+                        }
+                      }}
+                      className="p-2 hover:bg-rose-500/10 rounded-xl text-zinc-500 hover:text-rose-500 transition-all"
+                      title="프로젝트 삭제"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                ))
+              ) : (
+                <div className="text-center py-8 text-zinc-500 text-xs">생성된 드라마 기획안 프로젝트가 없습니다.</div>
+              )}
+            </div>
+
+            <div className="p-6 border-t border-zinc-800/40 flex justify-end bg-[#0A0A0E]/50">
+              <button 
+                onClick={() => setIsProjectManageModalOpen(false)}
+                className="px-6 py-2.5 bg-amber-500 hover:bg-amber-400 text-black text-xs font-black rounded-xl transition-all shadow-lg active:scale-95"
+              >
+                닫기
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 실시간 알림 토스트 컨테이너 */}
       <ToastContainer 

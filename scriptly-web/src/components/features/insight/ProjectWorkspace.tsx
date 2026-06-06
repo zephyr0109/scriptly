@@ -5,6 +5,7 @@ import {
   Settings, Database, PencilLine, Zap, CheckCircle2
 } from "lucide-react";
 import { cn, API_BASE_URL } from "@/lib/utils";
+import { useUIStore } from "@/store/useUIStore";
 import InsightLabView from "./InsightLabView";
 import ArchiveImportModal from "./ArchiveImportModal";
 import CharacterBoard from "./CharacterBoard";
@@ -88,6 +89,23 @@ const ProjectWorkspace = ({
   isGeneratingSynopsis
 }: ProjectWorkspaceProps) => {
   const [activeTab, setActiveTab] = useState("overview");
+  const { setModalOpen, resetPlotEventForm, setPlotEventForm } = useUIStore();
+
+  const handleOpenEventAdd = () => {
+    resetPlotEventForm();
+    setModalOpen("plotEvent", true);
+  };
+
+  const handleOpenEventEdit = (evt: any) => {
+    setPlotEventForm({
+      id: evt.id,
+      title: evt.title || "",
+      timeHint: evt.time_hint || "",
+      content: evt.content || "",
+      characterIds: evt.related_character_ids || []
+    });
+    setModalOpen("plotEvent", true);
+  };
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isGeneratingDraft, setIsGeneratingDraft] = useState(false);
@@ -349,14 +367,12 @@ const ProjectWorkspace = ({
                 events={events}
                 characters={characters}
                 isGenerating={isGeneratingPlot}
-                onCreateEvent={createEvent}
-                onUpdateEvent={updateEvent}
+                handleOpenEventAdd={handleOpenEventAdd}
+                handleOpenEventEdit={handleOpenEventEdit}
                 onDeleteEvent={deleteEvent}
                 onReorder={reorderEvents}
-                onGenerateDraft={generatePlotDraft}
                 isDarkMode={isDarkMode}
                 addToast={addToast}
-                labSources={labSources}
               />
             )}
 

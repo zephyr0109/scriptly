@@ -25,6 +25,7 @@ import ProjectCreateModal from "@/components/features/modals/ProjectCreateModal"
 import LinkArchiveModal from "@/components/features/modals/LinkArchiveModal";
 import CharacterModal from "@/components/features/modals/CharacterModal";
 import LinkInspirationProjectModal from "@/components/features/modals/LinkInspirationProjectModal";
+import PlotEventModal from "@/components/features/modals/PlotEventModal";
 import ToastContainer from "@/components/layout/ToastContainer";
 
 // 커스텀 훅 및 상태 관리 저장소 임포트
@@ -68,13 +69,22 @@ export default function IntegratedPrototype() {
     selectedProjectId, selectProject,
     selectedInspirationId, selectInspiration,
     selectedArchiveId, selectArchive,
-    isCollectModalOpen, isProjectModalOpen, isLinkArchiveModalOpen, isCharacterModalOpen,
+    isCollectModalOpen, isProjectModalOpen, isLinkArchiveModalOpen, isCharacterModalOpen, isPlotEventModalOpen,
     setModalOpen,
     
     // 캐릭터 폼 상태
     activeCharacterId, charName, charRole, charDesc, charDesire, charColor,
     charAge, charGender, charOccupation,
-    setCharacterForm, resetCharacterForm
+    setCharacterForm, resetCharacterForm,
+
+    // 플롯 사건 폼 상태
+    activePlotEventId,
+    plotEventTitle,
+    plotEventTimeHint,
+    plotEventContent,
+    plotEventCharacterIds,
+    setPlotEventForm,
+    resetPlotEventForm
   } = useUIStore();
 
   // 3. 보관함(Archive) 실 데이터 Custom Hook 연동
@@ -557,6 +567,53 @@ export default function IntegratedPrototype() {
       addToast(`신규 인물 '${charName}'이(가) 등록되었습니다!`, "success");
     }
     setModalOpen("character", false);
+  };
+
+  // 플롯 에피소드 사건 이벤트 핸들러 정의
+  const handleOpenEventAdd = () => {
+    resetPlotEventForm();
+    setModalOpen("plotEvent", true);
+  };
+
+  const handleOpenEventEdit = (evt: any) => {
+    setPlotEventForm({
+      id: evt.id,
+      title: evt.title || "",
+      timeHint: evt.time_hint || "",
+      content: evt.content || "",
+      characterIds: evt.related_character_ids || []
+    });
+    setModalOpen("plotEvent", true);
+  };
+
+  const handleSaveEvent = async () => {
+    if (!plotEventTitle.trim()) {
+      addToast("사건의 제목을 입력해주세요.", "error");
+      return;
+    }
+    if (!selectedProjectId) {
+      addToast("선택된 프로젝트가 없습니다.", "error");
+      return;
+    }
+
+    const payload = {
+      title: plotEventTitle,
+      time_hint: plotEventTimeHint,
+      content: plotEventContent,
+      related_character_ids: plotEventCharacterIds
+    };
+
+    if (activePlotEventId) {
+      await updateEvent(activePlotEventId, payload);
+      addToast(`사건 '${plotEventTitle}'의 내용이 수정되었습니다.`, "success");
+    } else {
+      await createEvent({
+        ...payload,
+        project_id: selectedProjectId
+      });
+      addToast(`신규 사건 '${plotEventTitle}'이(가) 등록되었습니다!`, "success");
+    }
+    setModalOpen("plotEvent", false);
   };
 
 
@@ -1358,14 +1415,15 @@ export default function IntegratedPrototype() {
 
               {activeWorkspaceTab === "plot" && (
                 <PlotTimeline 
-                  events={events.map(ev => ({
-                    id: ev.id,
-                    title: ev.title || "사건 에피소드",
-                    desc: ev.description || "사건의 연출과 갈등 서사 흐름 기술",
-                    duration: ev.duration || "1화 분량"
-                  }))} 
-                  handleOpenEventAdd={() => addToast("플롯 사건을 설계하는 입력 창은 정식 버전에서 지원됩니다.", "info")} 
-                  addToast={addToast} 
+                  events={events}
+                  projectId={selectedProjectId || undefined}
+                  characters={characters}
+                  isGenerating={isGeneratingPlot}
+                  handleOpenEventAdd={handleOpenEventAdd}
+                  handleOpenEventEdit={handleOpenEventEdit}
+                  onDeleteEvent={deleteEvent}
+                  onReorder={reorderEvents}
+                  addToast={addToast}
                 />
               )}
 
@@ -1580,6 +1638,22 @@ export default function IntegratedPrototype() {
         setCharacterForm={setCharacterForm}
         handleSaveCharacter={handleSaveCharacter}
         deleteCharacter={deleteCharacter}
+        addToast={addToast}
+      />
+
+      {/* 4.5 플롯 에피소드 사건 추가/수정 CRUD 모달 */}
+      <PlotEventModal 
+        isOpen={isPlotEventModalOpen}
+        onClose={() => setModalOpen("plotEvent", false)}
+        activePlotEventId={activePlotEventId}
+        plotEventTitle={plotEventTitle}
+        plotEventTimeHint={plotEventTimeHint}
+        plotEventContent={plotEventContent}
+        plotEventCharacterIds={plotEventCharacterIds}
+        characters={characters}
+        setPlotEventForm={setPlotEventForm}
+        handleSaveEvent={handleSaveEvent}
+        deleteEvent={deleteEvent}
         addToast={addToast}
       />
 

@@ -22,6 +22,7 @@ interface UIState {
   isProjectModalOpen: boolean;
   isLinkArchiveModalOpen: boolean;
   isCharacterModalOpen: boolean;          // 캐릭터 모달 활성화 제어
+  isPlotEventModalOpen: boolean;          // 플롯 사건 모달 활성화 제어
   
   // 5. 등장인물 추가/수정 폼 임시 상태
   activeCharacterId: string | null;       // null 이면 등록, string 이면 수정 모드
@@ -33,6 +34,13 @@ interface UIState {
   charAge: string;
   charGender: string;
   charOccupation: string;
+
+  // 5.5 플롯 사건 추가/수정 폼 임시 상태
+  activePlotEventId: string | null;       // null 이면 등록, string 이면 수정 모드
+  plotEventTitle: string;
+  plotEventTimeHint: string;
+  plotEventContent: string;
+  plotEventCharacterIds: string[];
 
   // 6. 액션 함수
   setActivity: (activity: "inspiration" | "workspace") => void;
@@ -46,9 +54,11 @@ interface UIState {
   selectProject: (projectId: string | null) => void;
   selectInspiration: (id: string | null) => void;
   selectArchive: (id: string | null) => void;
-  setModalOpen: (modal: "collect" | "project" | "linkArchive" | "character", open: boolean) => void;
+  setModalOpen: (modal: "collect" | "project" | "linkArchive" | "character" | "plotEvent", open: boolean) => void;
   setCharacterForm: (form: Partial<{ id: string | null; name: string; role: string; desc: string; desire: string; color: string; age: string; gender: string; occupation: string }>) => void;
   resetCharacterForm: () => void;
+  setPlotEventForm: (form: Partial<{ id: string | null; title: string; timeHint: string; content: string; characterIds: string[] }>) => void;
+  resetPlotEventForm: () => void;
 }
 
 export const useUIStore = create<UIState>((set) => ({
@@ -70,6 +80,7 @@ export const useUIStore = create<UIState>((set) => ({
   isProjectModalOpen: false,
   isLinkArchiveModalOpen: false,
   isCharacterModalOpen: false,
+  isPlotEventModalOpen: false,
 
   activeCharacterId: null,
   charName: "",
@@ -80,6 +91,12 @@ export const useUIStore = create<UIState>((set) => ({
   charAge: "",
   charGender: "",
   charOccupation: "",
+
+  activePlotEventId: null,
+  plotEventTitle: "",
+  plotEventTimeHint: "",
+  plotEventContent: "",
+  plotEventCharacterIds: [],
 
   // 2. 액션 구현
   setActivity: (activity) => set({ activeActivity: activity }),
@@ -98,6 +115,7 @@ export const useUIStore = create<UIState>((set) => ({
     if (modal === "project") return { isProjectModalOpen: open };
     if (modal === "linkArchive") return { isLinkArchiveModalOpen: open };
     if (modal === "character") return { isCharacterModalOpen: open };
+    if (modal === "plotEvent") return { isPlotEventModalOpen: open };
     return {};
   }),
   setCharacterForm: (form) => set((state) => ({
@@ -121,5 +139,19 @@ export const useUIStore = create<UIState>((set) => ({
     charAge: "",
     charGender: "",
     charOccupation: "",
+  }),
+  setPlotEventForm: (form) => set((state) => ({
+    activePlotEventId: form.id !== undefined ? form.id : state.activePlotEventId,
+    plotEventTitle: form.title !== undefined ? form.title : state.plotEventTitle,
+    plotEventTimeHint: form.timeHint !== undefined ? form.timeHint : state.plotEventTimeHint,
+    plotEventContent: form.content !== undefined ? form.content : state.plotEventContent,
+    plotEventCharacterIds: form.characterIds !== undefined ? form.characterIds : state.plotEventCharacterIds,
+  })),
+  resetPlotEventForm: () => set({
+    activePlotEventId: null,
+    plotEventTitle: "",
+    plotEventTimeHint: "",
+    plotEventContent: "",
+    plotEventCharacterIds: [],
   }),
 }));

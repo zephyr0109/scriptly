@@ -7,7 +7,7 @@ import {
   PenTool, Settings, LogOut, ChevronRight, ChevronDown, Eye, EyeOff,
   Sun, Moon, Search, Trash2, CornerDownRight, Check, Save, 
   HelpCircle, ArrowRight, Filter, ExternalLink, Upload, Globe, File, Calendar, SortAsc, X, Flame, ShieldAlert,
-  Compass, Bookmark, BookmarkCheck, RefreshCw
+  Compass, Bookmark, BookmarkCheck, RefreshCw, Loader2
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -55,7 +55,7 @@ export default function IntegratedPrototype() {
 
   // 1. 사용자 인증 및 로그인 가드 복원
   const router = useRouter();
-  const { user, isAuthenticated, logout } = useAuthStore();
+  const { user, isAuthenticated, logout, hasHydrated } = useAuthStore();
 
   // 2. Zustand 글로벌 UI 상태 연동
   const {
@@ -157,23 +157,12 @@ export default function IntegratedPrototype() {
     handleSaveLabSession
   } = useInsightLab(isDarkMode);
 
-  // 6. 하이드레이션 마운트가 완료되고 인증되지 않은 경우에만 강제 로그인 리다이렉트
+  // 6. 하이드레이션 마운트 및 로컬스토리지 복원이 완료되고 인증되지 않은 경우 강제 로그인 리다이렉트
   useEffect(() => {
-    if (isMounted) {
-      const storage = localStorage.getItem("scriptly-auth-storage");
-      if (storage) {
-        try {
-          const parsed = JSON.parse(storage);
-          if (parsed?.state?.isAuthenticated) {
-            return; 
-          }
-        } catch (e) {}
-      }
-      if (!isAuthenticated) {
-        router.push("/login");
-      }
+    if (isMounted && hasHydrated && !isAuthenticated) {
+      router.push("/login");
     }
-  }, [isMounted, isAuthenticated, router]);
+  }, [isMounted, hasHydrated, isAuthenticated, router]);
 
   // 프로젝트 로드 및 싱크 초기화
   useEffect(() => {
@@ -734,8 +723,33 @@ export default function IntegratedPrototype() {
     return list;
   }, [projectLinkedInspirations, archiveItems]);
 
-  // 12. 최종 인증 가드
-  if (!isAuthenticated) return null;
+  // 12. 최종 인증 및 하이드레이션 대기 가드
+  if (!isMounted || !hasHydrated || !isAuthenticated) {
+    return (
+      <div className="relative w-screen h-screen overflow-hidden flex items-center justify-center bg-[#0D0D11]">
+        {/* 블러 처리된 메인화면 형태의 은은한 백그라운드 데코레이션 */}
+        <div className="absolute inset-0 opacity-10 blur-[100px] pointer-events-none">
+          <div className="absolute top-1/4 left-1/4 w-[400px] h-[400px] bg-amber-500 rounded-full" />
+          <div className="absolute bottom-1/4 right-1/4 w-[400px] h-[400px] bg-indigo-600 rounded-full" />
+        </div>
+
+        {/* 중앙 로딩 스크린 */}
+        <div className="flex flex-col items-center gap-4 z-10 select-none animate-in fade-in duration-500">
+          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-amber-500 to-rose-600 flex items-center justify-center shadow-xl shadow-amber-500/10 border border-amber-500/20 animate-pulse">
+            <PenTool size={28} className="text-white" />
+          </div>
+          <div className="flex flex-col items-center gap-1">
+            <h1 className="text-[#E4E4ED] font-black text-sm tracking-wider uppercase">Scriptly</h1>
+            <p className="text-zinc-500 text-[10px] font-bold tracking-tight">드라마 집필 보조 에이전트 시스템</p>
+          </div>
+          <div className="flex items-center gap-1.5 mt-2 bg-zinc-900/60 border border-zinc-800/80 px-3 py-1.5 rounded-full">
+            <Loader2 size={12} className="animate-spin text-amber-500" />
+            <span className="text-zinc-400 text-[9px] font-black tracking-tight">인증 상태를 확인하고 있습니다...</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={cn(

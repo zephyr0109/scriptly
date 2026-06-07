@@ -1423,6 +1423,7 @@ export default function IntegratedPrototype() {
                   handleOpenEventEdit={handleOpenEventEdit}
                   onDeleteEvent={deleteEvent}
                   onReorder={reorderEvents}
+                  onGenerateDraft={generatePlotDraft}
                   addToast={addToast}
                 />
               )}
@@ -1496,6 +1497,7 @@ export default function IntegratedPrototype() {
         handleTriggerQuickAnalysis={handleTriggerQuickAnalysis}
         linkedReferenceItems={linkedReferenceItems}
         projects={projects}
+        archiveItems={archiveItems}
         onOpenLinkProjectModal={handleOpenLinkInspirationProjectModal}
         onRemoveReference={(id) => handleToggleLinkInspiration(id, false)}
         handleSaveToArchive={() => handleSaveToArchive(() => addToast("수집 기사가 영감 보관함에 복사 완료되었습니다.", "success"), (msg) => addToast(msg, "error"))}

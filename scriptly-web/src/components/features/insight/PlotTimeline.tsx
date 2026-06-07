@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { Plus, Trash2, Calendar, GripVertical, Edit2, Sparkles, BookOpen, AlertCircle } from "lucide-react";
+import { Plus, Trash2, Calendar, GripVertical, Edit2, Sparkles, BookOpen, AlertCircle, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useUIStore } from "@/store/useUIStore";
 
@@ -31,6 +31,7 @@ export default function PlotTimeline({
   handleOpenEventEdit,
   onDeleteEvent,
   onReorder,
+  onGenerateDraft,
   addToast,
   isDarkMode: propIsDarkMode
 }: PlotTimelineProps) {
@@ -39,6 +40,13 @@ export default function PlotTimeline({
 
   // 드래그앤드롭 행 재정렬을 위한 상태
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+
+  // 커스텀 컨펌 모달을 위한 로컬 상태
+  const [isConfirmOpen, setIsConfirmOpen] = useState(false);
+  const [confirmTitle, setConfirmTitle] = useState("");
+  const [confirmMessage, setConfirmMessage] = useState("");
+  const [confirmType, setConfirmType] = useState<"warning" | "danger" | "info">("info");
+  const [onConfirmAction, setOnConfirmAction] = useState<(() => void | Promise<void>) | null>(null);
 
   const triggerToast = (msg: string, type: "success" | "info" | "warning" | "error" = "success") => {
     if (addToast) {
@@ -73,12 +81,9 @@ export default function PlotTimeline({
       const eventIds = reorderedEvents.map(evt => evt.id);
       try {
         await onReorder(projectId, eventIds);
-        triggerToast("사건 순서가 안전하게 업데이트되었습니다.", "success");
       } catch (err) {
         triggerToast("순서 조정 저장에 실패했습니다.", "error");
       }
-    } else {
-      triggerToast("사건 순서가 화면에 임시 적용되었습니다. (정식 연동 대기)", "info");
     }
   };
 
@@ -99,31 +104,38 @@ export default function PlotTimeline({
         {/* 우상단 액션 버튼 그룹 */}
         <div className="flex items-center gap-3">
           <button 
-            onClick={() => triggerToast("참고 기획안 연동 서랍 기능이 준비 중입니다.", "info")}
-            className={cn(
-              "px-4 py-2.5 text-xs font-black rounded-xl transition-all shadow-sm active:scale-95 flex items-center gap-1.5 border",
-              isDarkMode 
-                ? "bg-zinc-900 border-zinc-800 text-zinc-300 hover:bg-zinc-800 hover:text-white" 
-                : "bg-white border-zinc-200 text-zinc-700 hover:bg-zinc-100 hover:text-zinc-950"
-            )}
-            title="기획안 참고 레퍼런스 열기"
-          >
-            <BookOpen size={13} />
-            <span>REFERENCE</span>
-          </button>
+            onClick={() => {
+              if (!projectId || !onGenerateDraft) return;
 
-          <button 
-            onClick={() => triggerToast("AI Support 기반 플롯 생성 기능은 기본 기능 검증 후 제공됩니다.", "info")}
+              setConfirmTitle("AI 플롯 일괄 생성 경고");
+              setConfirmMessage("AI 플롯 일괄 생성을 실행하면 현재 작성되어 있는 모든 플롯 타임라인의 기존 사건들이 '영구 삭제'되고 새로운 AI 초안으로 대체됩니다.\n\n정말로 진행하시겠습니까?");
+              setConfirmType("warning");
+              setOnConfirmAction(() => async () => {
+                try {
+                  await onGenerateDraft(projectId);
+                  triggerToast("AI가 보관함 영감 및 기획안 정보를 바탕으로 플롯 초안 일괄 생성을 시작했습니다.", "success");
+                } catch (err) {
+                  triggerToast("초안 일괄 생성 요청에 실패했습니다.", "error");
+                }
+              });
+              setIsConfirmOpen(true);
+            }}
+            disabled={isGenerating}
             className={cn(
               "px-4 py-2.5 text-xs font-black rounded-xl transition-all shadow-sm active:scale-95 flex items-center gap-1.5 border",
               isDarkMode 
                 ? "bg-indigo-950/20 border-indigo-900/40 text-indigo-400 hover:bg-indigo-900/20" 
-                : "bg-indigo-50 border-indigo-100 text-indigo-600 hover:bg-indigo-100"
+                : "bg-indigo-50 border-indigo-100 text-indigo-600 hover:bg-indigo-100",
+              isGenerating && "opacity-50 cursor-not-allowed"
             )}
             title="AI 기반 에피소드 자동 초안 설계"
           >
-            <Sparkles size={13} />
-            <span>AI SUPPORT</span>
+            {isGenerating ? (
+              <Loader2 size={13} className="animate-spin" />
+            ) : (
+              <Sparkles size={13} />
+            )}
+            <span>{isGenerating ? "GENERATING..." : "AI SUPPORT"}</span>
           </button>
 
           <button 
@@ -177,7 +189,7 @@ export default function PlotTimeline({
                     )}
                   >
                     {/* 순서 및 드래그 핸들 */}
-                    <td className="py-6 pl-6 text-center select-none">
+                    <td className="py-4 pl-6 text-center select-none">
                       <div className="flex items-center justify-center gap-1.5" title="드래그하여 순서 조정">
                         <GripVertical 
                           size={13} 
@@ -190,7 +202,7 @@ export default function PlotTimeline({
                     </td>
 
                     {/* TIME 시점 */}
-                    <td className="py-6 px-4 align-top">
+                    <td className="py-4 px-4 align-top">
                       <div className={cn(
                         "text-xs font-bold leading-relaxed whitespace-pre-wrap pr-2",
                         isDarkMode ? "text-zinc-400" : "text-zinc-700"
@@ -200,8 +212,8 @@ export default function PlotTimeline({
                     </td>
 
                     {/* EVENT DETAILS */}
-                    <td className="py-6 px-6 align-top">
-                      <div className="flex flex-col gap-2.5 pr-4">
+                    <td className="py-4 px-6 align-top">
+                      <div className="flex flex-col pr-4">
                         <h4 className={cn(
                           "text-xs font-black tracking-tight leading-snug cursor-pointer hover:underline hover:text-indigo-400 transition-all",
                           isDarkMode ? "text-zinc-100" : "text-zinc-950"
@@ -210,17 +222,11 @@ export default function PlotTimeline({
                         >
                           {evt.title || "사건 제목 없음"}
                         </h4>
-                        <p className={cn(
-                          "text-[11px] leading-relaxed font-semibold line-clamp-3",
-                          isDarkMode ? "text-zinc-450" : "text-zinc-500"
-                        )}>
-                          {evt.content || "상세 기술된 내용이 없습니다."}
-                        </p>
                       </div>
                     </td>
 
                     {/* CHARACTERS */}
-                    <td className="py-6 px-6 align-top">
+                    <td className="py-4 px-6 align-top">
                       {relatedChars.length > 0 ? (
                         <div className="flex flex-wrap gap-1.5 max-h-[75px] overflow-y-auto custom-scrollbar-dark pr-1">
                           {relatedChars.map((char: any) => (
@@ -243,7 +249,7 @@ export default function PlotTimeline({
                     </td>
 
                     {/* ACTIONS */}
-                    <td className="py-6 pr-6 text-center align-top select-none">
+                    <td className="py-4 pr-6 text-center align-top select-none">
                       <div className="flex items-center justify-center gap-1">
                         <button 
                           onClick={() => handleOpenEventEdit?.(evt)}
@@ -259,15 +265,19 @@ export default function PlotTimeline({
                         </button>
                         
                         <button 
-                          onClick={async () => {
-                            if (confirm("정말 이 플롯 사건을 타임라인에서 삭제하시겠습니까?")) {
+                          onClick={() => {
+                            setConfirmTitle("사건 삭제 확인");
+                            setConfirmMessage("정말 이 플롯 사건을 타임라인에서 영구히 삭제하시겠습니까?");
+                            setConfirmType("danger");
+                            setOnConfirmAction(() => async () => {
                               if (onDeleteEvent) {
                                 const success = await onDeleteEvent(evt.id);
                                 if (success) {
                                   triggerToast("사건이 타임라인에서 안전하게 제거되었습니다.", "info");
                                 }
                               }
-                            }
+                            });
+                            setIsConfirmOpen(true);
                           }}
                           className={cn(
                             "p-2 rounded-xl transition-all border",
@@ -302,6 +312,63 @@ export default function PlotTimeline({
           </table>
         </div>
       </div>
+
+      {isConfirmOpen && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[1100] p-4 animate-in fade-in duration-200">
+          <div className={cn(
+            "border w-full max-w-sm rounded-3xl overflow-hidden flex flex-col shadow-2xl animate-in scale-in duration-200",
+            isDarkMode ? "bg-[#14141A] border-zinc-800" : "bg-white border-zinc-200"
+          )}>
+            <div className="p-6 flex flex-col gap-3">
+              <div className="flex items-center gap-2">
+                {confirmType === "danger" || confirmType === "warning" ? (
+                  <span className="text-rose-500 text-lg">⚠️</span>
+                ) : (
+                  <span className="text-indigo-500 text-lg">ℹ️</span>
+                )}
+                <h3 className={cn("text-sm font-black", isDarkMode ? "text-white" : "text-zinc-950")}>
+                  {confirmTitle}
+                </h3>
+              </div>
+              <p className={cn("text-xs leading-relaxed font-semibold whitespace-pre-wrap", isDarkMode ? "text-zinc-400" : "text-zinc-650")}>
+                {confirmMessage}
+              </p>
+            </div>
+            <div className={cn(
+              "px-6 py-4 flex items-center justify-end gap-2 border-t",
+              isDarkMode ? "bg-zinc-900/40 border-zinc-800/40" : "bg-zinc-50 border-zinc-100"
+            )}>
+              <button
+                onClick={() => setIsConfirmOpen(false)}
+                className={cn(
+                  "px-4 py-2 text-[11px] font-black rounded-xl border transition-all active:scale-95 cursor-pointer",
+                  isDarkMode 
+                    ? "bg-zinc-950 border-zinc-800 text-zinc-400 hover:text-white" 
+                    : "bg-white border-zinc-200 text-zinc-600 hover:text-zinc-900"
+                )}
+              >
+                취소
+              </button>
+              <button
+                onClick={async () => {
+                  setIsConfirmOpen(false);
+                  if (onConfirmAction) {
+                    await onConfirmAction();
+                  }
+                }}
+                className={cn(
+                  "px-4 py-2 text-[11px] font-black text-white rounded-xl transition-all shadow-md active:scale-95 cursor-pointer",
+                  confirmType === "danger" 
+                    ? "bg-rose-600 hover:bg-rose-500 shadow-rose-600/10" 
+                    : "bg-indigo-600 hover:bg-indigo-500 shadow-indigo-600/10"
+                )}
+              >
+                확인
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

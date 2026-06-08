@@ -3,6 +3,7 @@
 비즈니스 로직과 외부 서비스 오케스트레이션을 담당하는 서비스 계층입니다.
 """
 import io
+import os
 import logging
 from uuid import UUID
 from datetime import datetime
@@ -11,7 +12,38 @@ from docx.shared import Pt, RGBColor
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from typing import List, Dict, Any
 
+# ReportLab 임포트 추가
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, PageBreak
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib import colors
+
 logger = logging.getLogger(__name__)
+
+# 크로스 플랫폼 한글 폰트 Fallback 등록 엔진
+font_paths = [
+    "/usr/share/fonts/noto/NotoSansCJK-Regular.ttc",          # Alpine Linux CJK Regular
+    "/usr/share/fonts/truetype/nanum/NanumGothic.ttf",        # Linux NanumGothic
+    "C:/Windows/Fonts/malgun.ttf",                            # Windows MalgunGothic
+    "C:/Windows/Fonts/gulim.ttc",                             # Windows Gulim Fallback
+    "/System/Library/Fonts/Supplemental/AppleGothic.ttf",     # macOS AppleGothic
+]
+
+loaded_font = False
+for path in font_paths:
+    if os.path.exists(path):
+        try:
+            pdfmetrics.registerFont(TTFont("KoreanFont", path))
+            logger.info(f"Successfully registered Korean font: {path}")
+            loaded_font = True
+            break
+        except Exception as e:
+            logger.warning(f"Failed to register font {path}: {e}")
+
+if not loaded_font:
+    logger.error("No Korean font registered. PDF may have character encoding errors.")
+
 
 class ExportService:
     def generate_docx(self, project: Dict[str, Any], characters: List[Dict[str, Any]], events: List[Dict[str, Any]]) -> io.BytesIO:
@@ -88,7 +120,168 @@ class ExportService:
     def generate_pdf(self, project: Dict[str, Any], characters: List[Dict[str, Any]], events: List[Dict[str, Any]]) -> io.BytesIO:
         logger.info(f"Executing generate_pdf for project_id: {project.get('id')}...")
         try:
-            raise NotImplementedError("PDF export is currently under development.")
+            buffer = io.BytesIO()
+            # SimpleDocTemplate을 사용하여 PDF 정의
+            doc = SimpleDocTemplate(
+                buffer,
+                rightMargin=54, leftMargin=54,
+                topMargin=54, bottomMargin=54
+            )
+            
+            # 스타일 시트 초기화 및 폰트 세팅
+            styles = getSampleStyleSheet()
+            
+            # 한글 폰트가 등록되어 있으면 KoreanFont를 쓰고, 없으면 기본 Helvetica를 사용
+            font_name = "KoreanFont" if loaded_font else "Helvetica"
+            
+            title_style = ParagraphStyle(
+                name="KoTitle",
+                parent=styles['Heading1'],
+                fontName=font_name,
+                fontSize=26,
+                leading=32,
+                alignment=1, # Center
+                spaceAfter=30,
+                textColor=colors.HexColor("#1e1b4b") # 어두운 남색
+            )
+            
+            h1_style = ParagraphStyle(
+                name="KoH1",
+                parent=styles['Heading2'],
+                fontName=font_name,
+                fontSize=15,
+                leading=19,
+                spaceBefore=18,
+                spaceAfter=8,
+                textColor=colors.HexColor("#b45309") # 브라운/오렌지 계열
+            )
+            
+            body_style = ParagraphStyle(
+                name="KoBody",
+                parent=styles['Normal'],
+                fontName=font_name,
+                fontSize=10,
+                leading=15,
+                spaceBefore=4,
+                spaceAfter=4,
+                textColor=colors.HexColor("#27272a") # 어두운 회색
+            )
+            
+            bullet_style = ParagraphStyle(
+                name="KoBullet",
+                parent=body_style,
+                leftIndent=15,
+                firstLineIndent=-10,
+                spaceAfter=6
+            )
+            
+            indent_style = ParagraphStyle(
+                name="KoIndent",
+                parent=body_style,
+                leftIndent=15,
+                spaceBefore=2,
+                spaceAfter=2,
+                textColor=colors.HexColor("#4b5563") # 약간 밝은 회색
+            )
+            
+            footer_style = ParagraphStyle(
+                name="KoFooter",
+                parent=styles['Normal'],
+                fontName=font_name,
+                fontSize=8,
+                leading=10,
+                alignment=2, # Right
+                textColor=colors.HexColor("#9ca3af")
+            )
+            
+            story = []
+            
+            # 1. 대제목 (Cover/Title)
+            story.append(Spacer(1, 40))
+            story.append(Paragraph(project.get("title", "무제 프로젝트"), title_style))
+            story.append(Spacer(1, 20))
+            
+            # 2. 로그라인 (Logline)
+            story.append(Paragraph("01. 로그라인 (Logline)", h1_style))
+            logline_text = project.get("logline", "") or "등록된 로그라인이 없습니다."
+            story.append(Paragraph(f"<i>&ldquo;{logline_text}&rdquo;</i>", body_style))
+            story.append(Spacer(1, 10))
+            
+            # 3. 기획의도 (Intended Purpose)
+            story.append(Paragraph("02. 기획의도 (Intended Purpose)", h1_style))
+            purpose_text = project.get("intended_purpose", "") or "등록된 기획의도가 없습니다."
+            # 줄바꿈 HTML 변환
+            purpose_html = purpose_text.replace('\n', '<br/>')
+            story.append(Paragraph(purpose_html, body_style))
+            story.append(Spacer(1, 10))
+            
+            # 4. 등장인물 (Characters)
+            story.append(Paragraph("03. 등장인물 (Characters)", h1_style))
+            if characters:
+                for char in characters:
+                    char_desc = char.get("description", "") or "설명 없음"
+                    char_desire = char.get("desire", "") or char.get("internal_desire", "") or "욕망 미설정"
+                    role_str = f"({char.get('role', '조연')})" if char.get('role') else ""
+                    occupation_str = f" - {char['occupation']}" if char.get('occupation') else ""
+                    
+                    story.append(Paragraph(
+                        f"• <b>{char['name']}</b> {role_str}{occupation_str}",
+                        bullet_style
+                    ))
+                    story.append(Paragraph(
+                        f"내면의 욕망: {char_desire}",
+                        indent_style
+                    ))
+                    story.append(Paragraph(
+                        f"상세 설정: {char_desc}",
+                        indent_style
+                    ))
+                    story.append(Spacer(1, 5))
+            else:
+                story.append(Paragraph("등록된 등장인물이 없습니다.", body_style))
+            story.append(Spacer(1, 10))
+            
+            # 5. 전체 줄거리 (Full Synopsis)
+            story.append(Paragraph("04. 전체 줄거리 (Full Synopsis)", h1_style))
+            synopsis_text = project.get("full_synopsis", "") or "등록된 시놉시스가 없습니다."
+            synopsis_html = synopsis_text.replace('\n', '<br/>')
+            story.append(Paragraph(synopsis_html, body_style))
+            story.append(Spacer(1, 15))
+            
+            # Page Break for Plot Timeline
+            story.append(PageBreak())
+            
+            # 6. 별첨. 전체 플롯 타임라인
+            story.append(Paragraph("별첨. 에피소드 플롯 타임라인", h1_style))
+            story.append(Spacer(1, 10))
+            if events:
+                for idx, event in enumerate(events):
+                    time_hint = f"[{event.get('time_hint')}]" if event.get('time_hint') else f"[사건 {idx+1}]"
+                    title = event.get('title', '사건 제목 없음')
+                    content = event.get('content', '') or '상세 서사가 등록되지 않았습니다.'
+                    
+                    story.append(Paragraph(
+                        f"<b>{time_hint} {title}</b>",
+                        body_style
+                    ))
+                    story.append(Paragraph(
+                        content.replace('\n', '<br/>'),
+                        indent_style
+                    ))
+                    story.append(Spacer(1, 6))
+            else:
+                story.append(Paragraph("등록된 플롯 사건 타임라인이 없습니다.", body_style))
+                
+            story.append(Spacer(1, 30))
+            
+            # 푸터
+            generation_time = datetime.now().strftime('%Y-%m-%d %H:%M')
+            story.append(Paragraph(f"Generated by Scriptly on {generation_time}", footer_style))
+            
+            # 빌드 실행
+            doc.build(story)
+            buffer.seek(0)
+            return buffer
         except Exception as e:
             logger.error(f"Error in generate_pdf: {e}", exc_info=True)
             raise

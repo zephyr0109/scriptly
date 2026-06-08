@@ -334,7 +334,7 @@ export default function RightInsightPanel({
                       </span>
                       <div className={cn(
                         "p-4 rounded-xl border-l-4 border-amber-500 border text-[11px] text-zinc-300 leading-relaxed font-extrabold",
-                        isDarkMode ? "bg-zinc-900 border-zinc-850" : "bg-white border-zinc-200"
+                        isDarkMode ? "bg-zinc-900 border-zinc-800" : "bg-white border-zinc-200"
                       )}>
                         "{analyzedProjects[activeInspiration.id].conflictStructure}"
                       </div>
@@ -348,7 +348,7 @@ export default function RightInsightPanel({
                       </span>
                       <div className={cn(
                         "p-4 rounded-xl border flex flex-col gap-3 text-[11px] text-zinc-455 leading-relaxed font-semibold",
-                        isDarkMode ? "bg-zinc-900/60 border-zinc-850" : "bg-white border-zinc-200"
+                        isDarkMode ? "bg-zinc-900/60 border-zinc-800" : "bg-white border-zinc-200"
                       )}>
                         <p>{analyzedProjects[activeInspiration.id].summaryAndVibe}</p>
                         <div className="border-t border-zinc-800/30 pt-2 flex flex-col gap-1">
@@ -361,7 +361,7 @@ export default function RightInsightPanel({
                     {/* D. 주요 키워드 해시태그 */}
                     <div className="flex flex-wrap gap-1.5">
                       {(analyzedProjects[activeInspiration.id].keywords || []).map((kw: string) => (
-                        <span key={kw} className="text-[10px] bg-zinc-850 text-zinc-300 px-2.5 py-1.5 rounded-lg font-bold border border-zinc-800/30">
+                        <span key={kw} className="text-[10px] bg-zinc-800 text-zinc-300 px-2.5 py-1.5 rounded-lg font-bold border border-zinc-800/30">
                           #{kw}
                         </span>
                       ))}

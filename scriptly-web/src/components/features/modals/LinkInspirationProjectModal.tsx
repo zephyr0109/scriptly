@@ -68,7 +68,7 @@ export default function LinkInspirationProjectModal({
         {/* 헤더 */}
         <div className={cn(
           "p-6 border-b flex items-center justify-between",
-          isDarkMode ? "border-zinc-850" : "border-zinc-150"
+          isDarkMode ? "border-zinc-800" : "border-zinc-150"
         )}>
           <div className="flex flex-col gap-1 min-w-0 pr-4">
             <h3 className={cn("text-sm font-black", isDarkMode ? "text-white" : "text-zinc-950")}>
@@ -116,7 +116,7 @@ export default function LinkInspirationProjectModal({
                     <div className="flex flex-col gap-1 pr-4 min-w-0">
                       <span className={cn(
                         "text-xs font-black truncate",
-                        isChecked ? (isDarkMode ? "text-amber-400" : "text-amber-600") : (isDarkMode ? "text-zinc-300" : "text-zinc-850")
+                        isChecked ? (isDarkMode ? "text-amber-400" : "text-amber-600") : (isDarkMode ? "text-zinc-300" : "text-zinc-800")
                       )}>
                         {proj.title}
                       </span>
@@ -129,7 +129,7 @@ export default function LinkInspirationProjectModal({
                       "w-5 h-5 rounded-lg border flex items-center justify-center transition-all shrink-0",
                       isChecked
                         ? "bg-amber-500 border-amber-500 text-black"
-                        : (isDarkMode ? "border-zinc-850 bg-zinc-950" : "border-zinc-300 bg-white")
+                        : (isDarkMode ? "border-zinc-800 bg-zinc-950" : "border-zinc-300 bg-white")
                     )}>
                       {isChecked && <Check size={12} className="stroke-[3]" />}
                     </div>
@@ -147,7 +147,7 @@ export default function LinkInspirationProjectModal({
         {/* 푸터 */}
         <div className={cn(
           "p-6 border-t flex justify-end gap-2.5",
-          isDarkMode ? "border-zinc-850 bg-[#0A0A0E]/50" : "border-zinc-150 bg-[#F8F9FC]/50"
+          isDarkMode ? "border-zinc-800 bg-[#0A0A0E]/50" : "border-zinc-150 bg-[#F8F9FC]/50"
         )}>
           <button
             onClick={onClose}

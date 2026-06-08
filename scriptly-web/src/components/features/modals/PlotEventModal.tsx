@@ -156,7 +156,7 @@ export default function PlotEventModal({
                         isSelected 
                           ? "bg-indigo-600 text-white border-indigo-500 shadow-md shadow-indigo-600/10" 
                           : isDarkMode
-                            ? "bg-zinc-850 border-zinc-800 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800"
+                            ? "bg-zinc-800 border-zinc-800 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800"
                             : "bg-zinc-100 border-zinc-200 text-zinc-650 hover:bg-zinc-200 hover:text-zinc-900"
                       )}
                     >

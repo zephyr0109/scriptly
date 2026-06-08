@@ -4,6 +4,9 @@ FROM ghcr.io/astral-sh/uv:python3.12-alpine
 # Set the working directory in the container
 WORKDIR /app
 
+# Install system dependencies (Korean fonts for PDF generation)
+RUN apk add --no-cache font-noto-cjk
+
 # Enable bytecode compilation
 ENV UV_COMPILE_BYTECODE=1
 

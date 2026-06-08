@@ -268,6 +268,7 @@ export default function IntegratedPrototype() {
   const [editProjectCoreConflict, setEditProjectCoreConflict] = useState("");
   const [editProjectTheme, setEditProjectTheme] = useState("");
   const [editProjectLogline, setEditProjectLogline] = useState("");
+  const [editProjectFullSynopsis, setEditProjectFullSynopsis] = useState("");
 
   const [isProjectManageModalOpen, setIsProjectManageModalOpen] = useState(false);
   const [isLinkInspirationProjectModalOpen, setIsLinkInspirationProjectModalOpen] = useState(false);
@@ -335,6 +336,7 @@ export default function IntegratedPrototype() {
       setEditProjectCoreConflict(currentProject.core_conflict || "");
       setEditProjectTheme(currentProject.theme || "");
       setEditProjectLogline(currentProject.logline || "");
+      setEditProjectFullSynopsis(currentProject.full_synopsis || "");
       setProjectLinkedInspirations(currentProject.linked_sources || []);
     } else {
       setEditProjectTitle("");
@@ -346,6 +348,7 @@ export default function IntegratedPrototype() {
       setEditProjectCoreConflict("");
       setEditProjectTheme("");
       setEditProjectLogline("");
+      setEditProjectFullSynopsis("");
       setProjectLinkedInspirations([]);
     }
   }, [currentProject]);
@@ -377,6 +380,78 @@ export default function IntegratedPrototype() {
       addToast("기획 저장에 실패했습니다.", "error");
     }
   }, [currentProject, editProjectTitle, editProjectGenre, formatSelectMode, customFormat, editProjectAtmosphere, editProjectIntendedPurpose, editProjectCoreConflict, editProjectTheme, editProjectLogline, updateProject, fetchProjects, addToast]);
+
+  // 시놉시스 수동 저장 핸들러
+  const handleSaveSynopsis = useCallback(async () => {
+    if (!currentProject) return;
+    try {
+      await updateProject(currentProject.id, {
+        logline: editProjectLogline,
+        full_synopsis: editProjectFullSynopsis
+      });
+      addToast("시놉시스가 성공적으로 저장되었습니다.", "success");
+      await fetchProjects();
+    } catch (e) {
+      addToast("시놉시스 저장에 실패했습니다.", "error");
+    }
+  }, [currentProject, editProjectLogline, editProjectFullSynopsis, updateProject, fetchProjects, addToast]);
+
+  // AI 로그라인 생성 연동 핸들러
+  const handleGenerateLogline = useCallback(async () => {
+    if (!currentProject) return;
+    try {
+      const updated = await generateLogline(currentProject.id);
+      if (updated) {
+        setEditProjectLogline(updated.logline || "");
+        addToast("AI 로그라인 생성에 성공했습니다.", "success");
+      }
+    } catch (err) {
+      addToast("AI 로그라인 생성에 실패했습니다.", "error");
+    }
+  }, [currentProject, generateLogline, addToast]);
+
+  // AI 시놉시스 생성 연동 핸들러
+  const handleGenerateSynopsis = useCallback(async () => {
+    if (!currentProject) return;
+    try {
+      const updated = await generateSynopsis(currentProject.id);
+      if (updated) {
+        setEditProjectFullSynopsis(updated.full_synopsis || "");
+        addToast("AI 시놉시스 줄거리 생성에 성공했습니다.", "success");
+      }
+    } catch (err) {
+      addToast("AI 시놉시스 줄거리 생성에 실패했습니다.", "error");
+    }
+  }, [currentProject, generateSynopsis, addToast]);
+
+  // Word/PDF 기획서 다운로드 핸들러
+  const handleExportDocument = useCallback(async (format: "word" | "pdf") => {
+    if (!currentProject) return;
+    try {
+      const token = useAuthStore.getState().accessToken;
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8100/api/v1"}/projects/${currentProject.id}/export/${format}`, {
+        headers: {
+          "Authorization": `Bearer ${token}`
+        }
+      });
+      
+      if (!response.ok) throw new Error("Export failed");
+      
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${currentProject.title}_synopsis.${format === "word" ? "docx" : "pdf"}`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+      addToast(`${format.toUpperCase()} 기획서가 성공적으로 다운로드되었습니다.`, "success");
+    } catch (err) {
+      console.error(err);
+      addToast("기획서 내보내기 다운로드에 실패했습니다.", "error");
+    }
+  }, [currentProject, addToast]);
 
   // 영감 연결/해제 토글 핸들러 (백엔드 linked_sources 동기화)
   const handleToggleLinkInspiration = useCallback(async (inspirationId: string, shouldLink: boolean) => {
@@ -1429,45 +1504,166 @@ export default function IntegratedPrototype() {
               )}
 
               {activeWorkspaceTab === "draft" && (
-                <div className="flex-grow overflow-y-auto custom-scrollbar-dark p-8 flex flex-col gap-6">
-                  <div className="flex items-center justify-between shrink-0">
-                    <div className="flex flex-col gap-1">
-                      <h2 className="text-xl font-black">AI 시놉시스 & 트리트먼트 설계실</h2>
-                      <p className="text-xs text-zinc-500">기획 정보와 극화 사건 카드를 결합하여 AI가 초안 시놉시스를 생성합니다.</p>
+                <div className="flex-grow overflow-y-auto custom-scrollbar-dark p-8 flex flex-col gap-6 select-none h-full min-h-0 animate-in fade-in duration-350">
+                  
+                  {/* 상단 타이틀 및 추출 제어 툴바 */}
+                  <div className="flex items-center justify-between border-b border-zinc-800/10 pb-5 shrink-0">
+                    <div className="flex flex-col gap-1.5">
+                      <h2 className="text-xl font-black tracking-tight text-white flex items-center gap-2">
+                        📖 시놉시스 및 기획서 설계실
+                      </h2>
+                      <p className="text-xs text-zinc-500 font-medium">
+                        드라마의 기획 정보, 캐릭터 프로필, 사건 타임라인을 최종 취합하고 최종 기획서로 배포합니다.
+                      </p>
                     </div>
-                  </div>
 
-                  <div className="grid grid-cols-3 gap-6">
-                    <div className="col-span-1 p-5 rounded-2xl border bg-[#14141E] border-zinc-800 flex flex-col gap-4">
-                      <h3 className="text-xs font-black text-amber-500 uppercase tracking-widest">생성 톤 조율</h3>
-                      
-                      <div className="flex flex-col gap-2">
-                        <span className="text-[10px] text-zinc-500 font-bold">에피소드 반영 강도</span>
-                        <select className="w-full bg-zinc-900 border border-zinc-800 p-2.5 rounded-xl text-xs font-bold outline-none text-white">
-                          <option>하드보일드 서스펜스 누아르</option>
-                          <option>빠르고 시원한 사이코패스 수사극</option>
-                          <option>인물 심리 묘사 집중형 멜로</option>
-                        </select>
-                      </div>
+                    <div className="flex items-center gap-3">
+                      <button 
+                        onClick={handleSaveSynopsis} 
+                        className="px-5 py-2.5 text-xs font-black bg-amber-500 hover:bg-amber-400 text-black rounded-xl transition-all shadow-md active:scale-95 cursor-pointer flex items-center gap-1.5"
+                        title="작성한 시놉시스(로그라인 및 전체 줄거리)를 데이터베이스에 저장합니다."
+                      >
+                        <span>시놉시스 저장</span>
+                      </button>
 
                       <button 
-                        onClick={() => addToast("시놉시스 초안 AI 합성을 비동기로 시작합니다.", "success")}
-                        className="w-full py-3 bg-amber-500 text-black hover:bg-amber-400 text-xs font-black rounded-xl shadow-lg transition-all active:scale-95 flex items-center justify-center gap-2 mt-4"
+                        onClick={() => handleExportDocument("word")}
+                        className="px-4 py-2.5 text-xs font-black bg-zinc-900 border border-zinc-800 hover:bg-zinc-800 text-zinc-300 hover:text-white rounded-xl transition-all shadow-sm active:scale-95 flex items-center gap-1.5 cursor-pointer"
+                        title="기획서 Word(.docx) 다운로드"
                       >
-                        시놉시스 AI 생성
+                        <span>Word 다운로드</span>
+                      </button>
+
+                      <button 
+                        onClick={() => handleExportDocument("pdf")}
+                        className="px-4 py-2.5 text-xs font-black bg-zinc-900 border border-zinc-800 hover:bg-zinc-800 text-zinc-300 hover:text-white rounded-xl transition-all shadow-sm active:scale-95 flex items-center gap-1.5 cursor-pointer"
+                        title="기획서 PDF(.pdf) 다운로드"
+                      >
+                        <span>PDF 다운로드</span>
                       </button>
                     </div>
-
-                    <div className="col-span-2 p-6 rounded-2xl border bg-[#14141E]/40 border-zinc-800/80 flex flex-col gap-4 min-h-[400px]">
-                      <div className="flex items-center justify-between border-b border-zinc-800/20 pb-3">
-                        <span className="text-xs font-black text-amber-500">생성 완료된 기획안 시놉시스 뼈대</span>
-                      </div>
-                      <div className="flex-1 text-xs leading-relaxed font-semibold text-zinc-400 flex flex-col gap-4 overflow-y-auto custom-scrollbar-dark max-h-[350px] p-2">
-                        <p className="font-extrabold text-sm text-white">제1화: 소리 없는 목소리 (시놉시스)</p>
-                        <p>검경 협조 아래 비밀 USB의 단서를 포렌식하던 황시목 검사는 우연히 거대 비자금 리스트 장부의 핵심을 습득하게 된다. 법과 세력의 칼날 위에 선 그와 한여진 경감은 서로 대립하는 것 같으면서도 거대한 어둠의 로비 권력을 파헤치기 위해 조용히 공조 관계를 맺는다. 갈등이 깊어갈수록, 사법부 핵심 요직의 인과적 비밀이 얽혀들며 파란을 예고한다...</p>
-                      </div>
-                    </div>
                   </div>
+
+                  {/* 2단 메인 컨텐츠 영역 */}
+                  <div className="grid grid-cols-3 gap-6">
+                    
+                    {/* A. 좌측 영역 (Read-Only) - 기획 개요 및 등장인물 */}
+                    <div className="col-span-1 flex flex-col gap-5">
+                      
+                      {/* 기획 요약 카드 */}
+                      <div className="p-5 rounded-2xl border bg-zinc-900/40 border-zinc-800/80 flex flex-col gap-4">
+                        <span className="text-[10px] font-black text-amber-500 uppercase tracking-widest">드라마 기획 개요</span>
+                        <div className="flex flex-col gap-1.5">
+                          <span className="text-[9px] text-zinc-500 font-bold uppercase">작품 제목</span>
+                          <h3 className="text-sm font-black text-white">{currentProject?.title || "무제"}</h3>
+                        </div>
+                        <div className="flex flex-col gap-1.5">
+                          <span className="text-[9px] text-zinc-500 font-bold uppercase">기획의도</span>
+                          <p className="text-xs text-zinc-400 font-semibold leading-relaxed whitespace-pre-wrap max-h-[200px] overflow-y-auto custom-scrollbar-dark select-text">
+                            {currentProject?.intended_purpose || "등록된 기획의도가 없습니다."}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* 등장인물 리스트 */}
+                      <div className="p-5 rounded-2xl border bg-zinc-900/40 border-zinc-800/80 flex flex-col gap-4">
+                        <span className="text-[10px] font-black text-amber-500 uppercase tracking-widest">캐릭터 리포트 ({characters.length}명)</span>
+                        <div className="flex flex-col gap-3 select-text">
+                          {characters.map((char) => (
+                            <div 
+                              key={char.id} 
+                              className="p-3.5 rounded-xl border bg-zinc-950/40 border-zinc-800 flex flex-col gap-2"
+                            >
+                              <div className="flex items-center justify-between gap-2">
+                                <h4 className="text-xs font-black text-white">{char.name}</h4>
+                                <span className="text-[8px] bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 px-2 py-0.5 rounded font-black shrink-0">
+                                  {char.role || "조연"}
+                                </span>
+                              </div>
+                              <p className="text-[10px] text-zinc-500 font-bold leading-none">
+                                직업: {char.occupation || "미상"}
+                              </p>
+                              {char.desire && (
+                                <div className="text-[9px] text-amber-450/90 font-extrabold leading-normal bg-amber-500/5 p-1.5 rounded-lg border border-amber-500/10">
+                                  욕망: {char.desire}
+                                </div>
+                              )}
+                              <p className="text-[10px] text-zinc-400 font-semibold leading-relaxed">
+                                {char.description || "등록된 인물 정보가 없습니다."}
+                              </p>
+                            </div>
+                          ))}
+                          {characters.length === 0 && (
+                            <div className="text-center py-10 text-zinc-500 text-xs font-bold">
+                              등록된 등장인물이 없습니다.
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                    </div>
+
+                    {/* B. 우측 영역 (Editable) - 로그라인 & 전체 줄거리 */}
+                    <div className="col-span-2 flex flex-col gap-5">
+                      
+                      {/* 로그라인 카드 */}
+                      <div className="p-6 rounded-2xl border bg-zinc-900/40 border-zinc-800/85 flex flex-col gap-4">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] font-black text-amber-500 uppercase tracking-widest">작품의 핵심 로그라인 (Logline)</span>
+                          <button 
+                            onClick={handleGenerateLogline}
+                            disabled={isGeneratingSynopsis}
+                            className="px-3 py-1.5 text-[9px] font-black text-indigo-400 bg-indigo-950/20 border border-indigo-900/30 hover:bg-indigo-900/20 rounded-lg flex items-center gap-1 active:scale-95 transition-all cursor-pointer disabled:opacity-50"
+                          >
+                            {isGeneratingSynopsis ? (
+                              <Loader2 size={10} className="animate-spin" />
+                            ) : (
+                              <Sparkles size={10} />
+                            )}
+                            <span>AI 생성</span>
+                          </button>
+                        </div>
+                        
+                        <textarea 
+                          value={editProjectLogline}
+                          onChange={(e) => setEditProjectLogline(e.target.value)}
+                          rows={3}
+                          placeholder="작품을 관통하는 한 줄의 강렬한 로그라인을 직접 작성하거나 AI를 통해 제안받아 보세요..."
+                          className="bg-zinc-950 border border-zinc-800 text-xs font-semibold text-white px-4 py-3 rounded-xl w-full resize-none leading-relaxed focus:border-amber-500/40 outline-none select-text"
+                        />
+                      </div>
+
+                      {/* 전체 줄거리 카드 */}
+                      <div className="p-6 rounded-2xl border bg-zinc-900/40 border-zinc-800/85 flex flex-col gap-4">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] font-black text-amber-500 uppercase tracking-widest">전체 줄거리 (Synopsis)</span>
+                          <button 
+                            onClick={handleGenerateSynopsis}
+                            disabled={isGeneratingSynopsis}
+                            className="px-3 py-1.5 text-[9px] font-black text-indigo-400 bg-indigo-950/20 border border-indigo-900/30 hover:bg-indigo-900/20 rounded-lg flex items-center gap-1 active:scale-95 transition-all cursor-pointer disabled:opacity-50"
+                          >
+                            {isGeneratingSynopsis ? (
+                              <Loader2 size={10} className="animate-spin" />
+                            ) : (
+                              <Sparkles size={10} />
+                            )}
+                            <span>AI 생성</span>
+                          </button>
+                        </div>
+
+                        <textarea 
+                          value={editProjectFullSynopsis}
+                          onChange={(e) => setEditProjectFullSynopsis(e.target.value)}
+                          rows={16}
+                          placeholder="프로젝트의 타임라인 사건들을 융합하여 기승전결이 매끄러운 전체 스토리를 서술하거나, AI를 통해 일괄 합성 생성하세요..."
+                          className="bg-zinc-950 border border-zinc-800 text-xs font-semibold text-white px-4 py-4 rounded-xl w-full resize-none leading-relaxed focus:border-amber-500/40 outline-none select-text min-h-[500px]"
+                        />
+                      </div>
+
+                    </div>
+
+                  </div>
+
                 </div>
               )}
 

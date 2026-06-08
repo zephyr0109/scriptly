@@ -99,7 +99,7 @@ export default function ArchiveFilterGrid({
             <p className={cn(
               "text-xs leading-relaxed font-medium flex-1",
               item.rawType === "NOTE" 
-                ? (isDarkMode ? "text-zinc-300 bg-zinc-950/40 p-3.5 rounded-xl border border-zinc-850 whitespace-pre-wrap" : "text-zinc-800 bg-zinc-100/50 p-3.5 rounded-xl border border-zinc-200 whitespace-pre-wrap")
+                ? (isDarkMode ? "text-zinc-300 bg-zinc-950/40 p-3.5 rounded-xl border border-zinc-800 whitespace-pre-wrap" : "text-zinc-800 bg-zinc-100/50 p-3.5 rounded-xl border border-zinc-200 whitespace-pre-wrap")
                 : "text-zinc-400 line-clamp-3"
             )}>
               {item.desc}

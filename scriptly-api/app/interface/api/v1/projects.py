@@ -207,6 +207,10 @@ async def export_project_document(
         file_stream = export_service.generate_docx(project_data, char_list, event_list)
         filename = f"{project.title}_synopsis.docx"
         content_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    elif export_format.lower() == "pdf":
+        file_stream = export_service.generate_pdf(project_data, char_list, event_list)
+        filename = f"{project.title}_synopsis.pdf"
+        content_type = "application/pdf"
     else:
         raise HTTPException(status_code=400, detail="Invalid export format. Use 'word' or 'pdf'.")
 

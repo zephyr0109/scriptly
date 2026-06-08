@@ -159,7 +159,7 @@ export default function PlotTimeline({
             <thead>
               <tr className={cn(
                 "border-b text-[10px] font-black uppercase tracking-widest sticky top-0 z-10 select-none",
-                isDarkMode ? "bg-[#111118] border-zinc-850 text-zinc-500" : "bg-zinc-50 border-zinc-150 text-zinc-500"
+                isDarkMode ? "bg-[#111118] border-zinc-800 text-zinc-500" : "bg-zinc-50 border-zinc-150 text-zinc-500"
               )}>
                 <th className="py-4 pl-6 w-[70px] text-center">순서</th>
                 <th className="py-4 px-4 w-[160px]">TIME (발생 시점)</th>
@@ -256,7 +256,7 @@ export default function PlotTimeline({
                           className={cn(
                             "p-2 rounded-xl transition-all border",
                             isDarkMode 
-                              ? "bg-zinc-900 border-zinc-850 text-zinc-500 hover:text-white hover:bg-zinc-800" 
+                              ? "bg-zinc-900 border-zinc-800 text-zinc-500 hover:text-white hover:bg-zinc-800" 
                               : "bg-white border-zinc-200 text-zinc-500 hover:text-zinc-950 hover:bg-zinc-100"
                           )}
                           title="사건 수정"
@@ -282,7 +282,7 @@ export default function PlotTimeline({
                           className={cn(
                             "p-2 rounded-xl transition-all border",
                             isDarkMode 
-                              ? "bg-zinc-900 border-zinc-850 text-zinc-500 hover:text-rose-400 hover:bg-rose-500/10 hover:border-rose-500/20" 
+                              ? "bg-zinc-900 border-zinc-800 text-zinc-500 hover:text-rose-400 hover:bg-rose-500/10 hover:border-rose-500/20" 
                               : "bg-white border-zinc-200 text-zinc-500 hover:text-rose-600 hover:bg-rose-50 hover:border-rose-100"
                           )}
                           title="사건 삭제"

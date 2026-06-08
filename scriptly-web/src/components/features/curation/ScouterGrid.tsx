@@ -7,11 +7,21 @@ import { useUIStore } from "@/store/useUIStore";
 
 interface ScouterGridProps {
   isLoading: boolean;
+  isLoadingMore?: boolean;
   activeInspirations: any[];
   selectInspiration?: (id: string) => void;
+  searchQuery?: string;
+  handleLoadMore?: () => void;
 }
 
-export default function ScouterGrid({ isLoading, activeInspirations, selectInspiration }: ScouterGridProps) {
+export default function ScouterGrid({ 
+  isLoading, 
+  isLoadingMore = false, 
+  activeInspirations, 
+  selectInspiration,
+  searchQuery = "",
+  handleLoadMore
+}: ScouterGridProps) {
   const {
     isDarkMode,
     selectedInspirationId,
@@ -33,44 +43,67 @@ export default function ScouterGrid({ isLoading, activeInspirations, selectInspi
       )}
 
       {!isLoading && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-2">
-          {activeInspirations.map((insp) => (
-            <div 
-              key={insp.id}
-              onClick={() => {
-                if (selectInspiration) {
-                  selectInspiration(insp.id);
-                } else {
-                  storeSelectInspiration(insp.id);
-                }
-              }}
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-2">
+            {activeInspirations.map((insp) => (
+              <div 
+                key={insp.id}
+                onClick={() => {
+                  if (selectInspiration) {
+                    selectInspiration(insp.id);
+                  } else {
+                    storeSelectInspiration(insp.id);
+                  }
+                }}
+                className={cn(
+                  "p-6 rounded-2xl border cursor-pointer transition-all duration-300 hover:scale-[1.01] flex flex-col gap-3 group relative overflow-hidden",
+                  selectedInspirationId === insp.id 
+                    ? (isDarkMode ? "bg-[#1E1E28] border-amber-500 shadow-xl shadow-amber-500/5" : "bg-amber-50/40 border-amber-500 shadow-md")
+                    : (isDarkMode ? "bg-[#14141A] border-zinc-800 hover:border-zinc-700" : "bg-white border-zinc-200 hover:border-zinc-300")
+                )}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] bg-red-500/10 text-red-400 px-2 py-0.5 rounded font-black">{insp.keyword || insp.main_keyword || "시사속보"}</span>
+                  <span className="text-[10px] text-zinc-500 font-semibold">{insp.source || "네이버 뉴스"}</span>
+                </div>
+                <h3 className={cn(
+                  "text-sm font-black leading-relaxed group-hover:text-amber-400 transition-colors",
+                  selectedInspirationId === insp.id ? "text-amber-400" : (isDarkMode ? "text-white" : "text-zinc-900")
+                )}>
+                  {insp.title}
+                </h3>
+                <p className="text-xs text-zinc-400 leading-relaxed font-semibold line-clamp-3">
+                  {insp.desc || insp.content}
+                </p>
+                
+                <div className="flex items-center justify-between border-t border-zinc-800/10 pt-3 mt-1">
+                  <span className="text-[10px] text-zinc-500">{insp.date || (insp.published_at ? insp.published_at.split("T")[0] : "")}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {activeInspirations.length >= 10 && searchQuery && !isLoadingMore && handleLoadMore && (
+            <button 
+              onClick={handleLoadMore}
               className={cn(
-                "p-6 rounded-2xl border cursor-pointer transition-all duration-300 hover:scale-[1.01] flex flex-col gap-3 group relative overflow-hidden",
-                selectedInspirationId === insp.id 
-                  ? (isDarkMode ? "bg-[#1E1E28] border-amber-500 shadow-xl shadow-amber-500/5" : "bg-amber-50/40 border-amber-500 shadow-md")
-                  : (isDarkMode ? "bg-[#14141A] border-zinc-800 hover:border-zinc-700" : "bg-white border-zinc-200 hover:border-zinc-300")
+                "w-full py-5 mt-6 font-bold rounded-2xl transition-all border-2 text-xs uppercase tracking-widest active:scale-[0.99]",
+                isDarkMode 
+                  ? "bg-zinc-900 border-zinc-800 text-zinc-500 hover:text-amber-500" 
+                  : "bg-white border-zinc-200 text-zinc-400 hover:bg-zinc-50 hover:text-amber-600 shadow-sm"
               )}
             >
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] bg-red-500/10 text-red-400 px-2 py-0.5 rounded font-black">{insp.keyword || insp.main_keyword || "시사속보"}</span>
-                <span className="text-[10px] text-zinc-500 font-semibold">{insp.source || "네이버 뉴스"}</span>
-              </div>
-              <h3 className={cn(
-                "text-sm font-black leading-relaxed group-hover:text-amber-400 transition-colors",
-                selectedInspirationId === insp.id ? "text-amber-400" : (isDarkMode ? "text-white" : "text-zinc-900")
-              )}>
-                {insp.title}
-              </h3>
-              <p className="text-xs text-zinc-400 leading-relaxed font-semibold line-clamp-3">
-                {insp.desc || insp.content}
-              </p>
-              
-              <div className="flex items-center justify-between border-t border-zinc-800/10 pt-3 mt-1">
-                <span className="text-[10px] text-zinc-500">{insp.date || (insp.published_at ? insp.published_at.split("T")[0] : "")}</span>
-              </div>
+              더 많은 기사 불러오기
+            </button>
+          )}
+
+          {isLoadingMore && (
+            <div className="flex items-center justify-center py-6 gap-2 text-amber-500 text-xs font-bold animate-pulse mt-4">
+              <div className="w-4 h-4 border-2 border-amber-500 border-t-transparent rounded-full animate-spin" />
+              <span>더 많은 기사 스카우팅 중...</span>
             </div>
-          ))}
-        </div>
+          )}
+        </>
       )}
     </div>
   );

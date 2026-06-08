@@ -133,10 +133,10 @@ async def trigger_analysis(
     db: AsyncSession = Depends(get_db)
 ):
     """네이버 뉴스 검색 및 스카우터 임시 저장 (로그인 필수)"""
-    logger.info(f"API Request: trigger_analysis query: {request.query} by user: {current_user.id}")
+    logger.info(f"API Request: trigger_analysis query: {request.query}, start: {request.start} by user: {current_user.id}")
     naver_service = NaverNewsService()
     try:
-        raw_news = await naver_service.search_news(query=request.query, display=request.limit)
+        raw_news = await naver_service.search_news(query=request.query, display=request.limit, start=request.start)
     except Exception as e:
         logger.error(f"Error in naver search: {e}")
         raise HTTPException(status_code=500, detail="Naver Search Failed")

@@ -488,14 +488,14 @@ export default function RightInsightPanel({
             </button>
           </div>
 
-          <div className="flex-1 flex flex-col gap-4 overflow-y-auto pr-1">
+          <div className="flex-1 flex flex-col gap-4 overflow-y-auto pr-1 custom-scrollbar-dark">
             {linkedReferenceItems.map(item => {
               const isOpen = openReferenceAccordionId === item.id;
               return (
                 <div 
                   key={item.id}
                   className={cn(
-                    "border rounded-2xl transition-all duration-300 overflow-hidden flex flex-col",
+                    "border rounded-2xl transition-all duration-300 overflow-hidden flex flex-col shrink-0",
                     isOpen 
                       ? (isDarkMode ? "bg-[#14141E]/40 border-amber-500/30" : "bg-white border-zinc-300 shadow-sm")
                       : (isDarkMode ? "bg-zinc-900/10 border-zinc-800/80 hover:border-zinc-700" : "bg-zinc-50 border-zinc-200")
@@ -525,7 +525,7 @@ export default function RightInsightPanel({
                           <button
                             onClick={() => {
                               setFocusedInspiration(item);
-                              if (!analyzedProjects[item.id]) {
+                              if (!analyzedProjects || !analyzedProjects[item.id]) {
                                 handleTriggerQuickAnalysis(item.id, true);
                               }
                             }}

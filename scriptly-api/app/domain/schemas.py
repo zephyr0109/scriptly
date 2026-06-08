@@ -252,6 +252,7 @@ class ProjectEventRead(ProjectEventBase):
 class NewsSearchRequest(BaseModel):
     query: str
     limit: int = Field(default=10, ge=1, le=50)
+    start: int = Field(default=1, ge=1)
 
 class CharacterBase(DomainModel):
     name: str

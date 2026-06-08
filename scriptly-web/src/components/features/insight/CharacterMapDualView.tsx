@@ -36,6 +36,8 @@ interface CharacterMapDualViewProps {
   handleOpenCharacterAdd: () => void;
   handleOpenCharacterEdit: (char: any) => void;
   syncCharacters: (projectId: string, sourceIds: string[]) => Promise<any>;
+  deleteCharacter: (id: string) => Promise<boolean>;
+  handleGenerateMapDraft: (projectId: string) => Promise<void>;
   project: any;
   isDarkMode: boolean;
   nodes: any[];
@@ -53,6 +55,8 @@ function CharacterMapDualViewInner({
   handleOpenCharacterAdd,
   handleOpenCharacterEdit,
   syncCharacters,
+  deleteCharacter,
+  handleGenerateMapDraft,
   project,
   isDarkMode,
   nodes,
@@ -70,6 +74,7 @@ function CharacterMapDualViewInner({
   
   const [isSyncing, setIsSyncing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
   
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const { screenToFlowPosition, setCenter } = useReactFlow();
@@ -216,24 +221,24 @@ function CharacterMapDualViewInner({
     setEdges((eds: any) => eds.filter((e: any) => !deletedIds.has(e.id)));
   }, [setEdges]);
 
-  // AI Support 자동 생성 핸들러 (기존 데이터 유지 보존 보장)
-  const handleSyncCharacters = async () => {
+  // AI Support 관계도 초안 생성 핸들러 (고정 데이터 제외 리셋)
+  const handleGenerateMap = async () => {
     if (!project) {
       addToast("선택된 프로젝트를 찾을 수 없습니다.", "error");
       return;
     }
+    const sourceIds = project.linked_sources || [];
+    if (sourceIds.length === 0) {
+      addToast("분석할 기사나 영감 소스가 연결되어 있지 않습니다. [Linked Archive]에 소스를 추가해 주세요.", "warning");
+      return;
+    }
     setIsSyncing(true);
     try {
-      const sourceIds = project.linked_sources || [];
-      if (sourceIds.length === 0) {
-        addToast("분석할 기사나 영감 소스가 연결되어 있지 않습니다. [Linked Archive]에 소스를 추가해 주세요.", "warning");
-        return;
-      }
-      await syncCharacters(project.id, sourceIds);
-      addToast("AI 캐릭터 추출 동기화가 완료되었습니다. (기존 캐릭터는 유지됩니다.)", "success");
+      await handleGenerateMapDraft(project.id);
+      addToast("AI 인물 관계도 초안이 성공적으로 생성되었습니다.", "success");
     } catch (err: any) {
       console.error(err);
-      addToast("AI 캐릭터 동기화 중 오류가 발생했습니다.", "error");
+      addToast(err.message || "AI 인물 관계도 생성 중 오류가 발생했습니다.", "error");
     } finally {
       setIsSyncing(false);
     }
@@ -274,10 +279,10 @@ function CharacterMapDualViewInner({
         {/* 상단 버튼 그룹 */}
         <div className="flex items-center gap-3">
           <button 
-            onClick={handleSyncCharacters}
+            onClick={() => setShowConfirmModal(true)}
             disabled={isSyncing}
             className="px-4 py-2.5 text-xs font-black bg-gradient-to-r from-orange-600 to-amber-500 text-white rounded-xl transition-all shadow-md active:scale-95 flex items-center gap-1.5 disabled:opacity-50 hover:brightness-110"
-            title="기사 분석 내용을 기반으로 인물 자동 추출 추가"
+            title="기사 분석 내용을 기반으로 인물 관계도 초안 자동 생성"
           >
             {isSyncing ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
             <span>AI Support</span>
@@ -354,16 +359,31 @@ function CharacterMapDualViewInner({
                         </span>
                       )}
                     </div>
-                    <button 
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleOpenCharacterEdit(char);
-                      }}
-                      className="p-1 hover:bg-zinc-800 rounded-lg text-zinc-500 hover:text-white transition-colors shrink-0"
-                      title="프로필 수정"
-                    >
-                      <Edit2 size={11} />
-                    </button>
+                    <div className="flex gap-1 shrink-0">
+                      <button 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleOpenCharacterEdit(char);
+                        }}
+                        className="p-1 hover:bg-zinc-800 rounded-lg text-zinc-500 hover:text-white transition-colors"
+                        title="프로필 수정"
+                      >
+                        <Edit2 size={11} />
+                      </button>
+                      <button 
+                        onClick={async (e) => {
+                          e.stopPropagation();
+                          if (confirm(`정말 인물 '${char.name}'을(를) 삭제하시겠습니까?`)) {
+                            await deleteCharacter(char.id);
+                            addToast("인물 프로필이 완벽히 삭제되었습니다.", "info");
+                          }
+                        }}
+                        className="p-1 hover:bg-zinc-800 rounded-lg text-zinc-550 hover:text-rose-400 transition-colors"
+                        title="인물 삭제"
+                      >
+                        <Trash2 size={11} />
+                      </button>
+                    </div>
                   </div>
                   
                   <div className="flex flex-wrap gap-1">
@@ -547,7 +567,45 @@ function CharacterMapDualViewInner({
             </div>
           </div>
           <h2 className="text-lg font-black text-white tracking-widest uppercase animate-pulse mb-1">Extracting Characters...</h2>
-          <p className="text-zinc-500 text-xs font-semibold">연결된 영감 아카이브 소스로부터 인물들을 추출하여 동기화하고 있습니다.</p>
+          <p className="text-zinc-550 text-xs font-semibold">연결된 영감 아카이브 소스로부터 인물 및 맵 관계도를 생성하고 있습니다.</p>
+        </div>
+      )}
+
+      {/* AI 생성 확인 모달 */}
+      {showConfirmModal && (
+        <div className="fixed inset-0 z-[1100] flex items-center justify-center p-6 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+           <div className={cn(
+             "w-[420px] rounded-2xl border p-8 space-y-6 relative shadow-2xl",
+             isDarkMode ? "bg-[#14141A] border-zinc-800" : "bg-white border-zinc-200"
+           )}>
+              <div className="flex flex-col items-center text-center space-y-4">
+                 <div className="w-16 h-16 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center text-amber-600">
+                    <Sparkles size={32} />
+                 </div>
+                 <h2 className="text-xl font-black">AI 맵 초안을 생성하시겠습니까?</h2>
+                 <p className="text-sm text-zinc-500 leading-relaxed">
+                    새로운 초안을 생성하면 캔버스에 있는 <strong>고정되지 않은 인물과 모든 관계</strong>가 초기화됩니다.<br />
+                    고정된 핵심 인물을 중심으로 다시 인물 관계도를 재구성합니다.
+                 </p>
+              </div>
+              <div className="flex gap-3 pt-2">
+                 <button 
+                   onClick={() => setShowConfirmModal(false)}
+                   className={cn("flex-1 py-3 rounded-xl text-xs font-bold transition-all", isDarkMode ? "bg-zinc-800 hover:bg-zinc-700 text-zinc-300" : "bg-zinc-100 hover:bg-zinc-200 text-zinc-650")}
+                 >
+                    취소
+                 </button>
+                 <button 
+                   onClick={async () => {
+                     setShowConfirmModal(false);
+                     await handleGenerateMap();
+                   }}
+                   className="flex-1 py-3 rounded-xl bg-orange-600 hover:bg-orange-500 text-white text-xs font-bold shadow-lg shadow-orange-900/20 transition-all"
+                 >
+                    네, 생성하겠습니다
+                 </button>
+              </div>
+           </div>
         </div>
       )}
     </div>

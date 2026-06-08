@@ -94,11 +94,32 @@ class CharacterService:
                 for p in people:
                     name = p.get("name", "이름 없음")
                     if name not in existing_names:
+                        # 역할 비중 파싱 및 매핑
+                        raw_role = p.get("role", "조연")
+                        role = "조연"
+                        if raw_role in ["주연", "주조연", "조연", "단역", "카메오"]:
+                            role = raw_role
+                        else:
+                            # 유사어 매핑 Fallback
+                            if "주인공" in raw_role or "주연" in raw_role or "대립자" in raw_role or "빌런" in raw_role or "주역" in raw_role:
+                                role = "주연"
+                            elif "주조연" in raw_role or "조주연" in raw_role:
+                                role = "주조연"
+                            elif "조연" in raw_role or "조력자" in raw_role:
+                                role = "조연"
+                            elif "단역" in raw_role or "엑스트라" in raw_role or "카메오" in raw_role:
+                                role = "단역"
+
+                        # 직업 파싱 (occupation 우선, 없을 경우 옛날 규격 하위호환을 위해 role을 fallback으로 활용)
+                        occupation = p.get("occupation", p.get("role", ""))
+                        if occupation == role:  # 만약 직업 란에 역할명만 복제되었다면 비워줌
+                            occupation = ""
+
                         char = CharacterModel(
                             project_id=project_id,
                             name=name,
-                            role="조연",  # AI 자동 동기화 인물은 기본적으로 '조연'으로 매핑
-                            occupation=p.get("role", ""),
+                            role=role,
+                            occupation=occupation,
                             description=p.get("description", ""),
                             char_metadata={"source_id": str(s.id), "source_title": s.title}
                         )

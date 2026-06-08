@@ -213,7 +213,7 @@ export default function PlotTimeline({
 
                     {/* EVENT DETAILS */}
                     <td className="py-4 px-6 align-top">
-                      <div className="flex flex-col pr-4">
+                      <div className="flex flex-col pr-4 gap-1.5">
                         <h4 className={cn(
                           "text-xs font-black tracking-tight leading-snug cursor-pointer hover:underline hover:text-indigo-400 transition-all",
                           isDarkMode ? "text-zinc-100" : "text-zinc-950"
@@ -222,6 +222,14 @@ export default function PlotTimeline({
                         >
                           {evt.title || "사건 제목 없음"}
                         </h4>
+                        {evt.content && (
+                          <p className={cn(
+                            "text-[11px] leading-relaxed whitespace-pre-wrap mt-0.5",
+                            isDarkMode ? "text-zinc-400" : "text-zinc-650"
+                          )}>
+                            {evt.content}
+                          </p>
+                        )}
                       </div>
                     </td>
 

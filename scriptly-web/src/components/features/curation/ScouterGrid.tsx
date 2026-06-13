@@ -38,7 +38,7 @@ export default function ScouterGrid({
       {isLoading && (
         <div className="flex-grow flex flex-col items-center justify-center py-20 gap-4">
           <div className="w-10 h-10 border-4 border-amber-500 border-t-transparent rounded-full animate-spin" />
-          <span className="text-sm font-bold text-amber-500">실시간 스카우팅 및 극화 가능 장부 파싱 중...</span>
+          <span className="text-sm font-bold text-amber-500">불러오는 중...</span>
         </div>
       )}
 

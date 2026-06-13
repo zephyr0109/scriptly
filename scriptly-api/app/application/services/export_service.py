@@ -285,3 +285,251 @@ class ExportService:
         except Exception as e:
             logger.error(f"Error in generate_pdf: {e}", exc_info=True)
             raise
+
+    def generate_script_docx(self, title: str, html_content: str) -> io.BytesIO:
+        """대본 HTML을 파싱하여 정밀하게 서식화된 Word (.docx) 문서를 생성합니다."""
+        from bs4 import BeautifulSoup
+        import re
+        from docx.shared import Inches, Pt
+
+        logger.info(f"Generating script DOCX for: {title}")
+        doc = Document()
+
+        # A4 여백 설정 (상하좌우 20mm, 약 0.8인치)
+        for section in doc.sections:
+            section.top_margin = Inches(0.8)
+            section.bottom_margin = Inches(0.8)
+            section.left_margin = Inches(0.8)
+            section.right_margin = Inches(0.8)
+
+        # 기본 글꼴 설정 (바탕체)
+        style = doc.styles['Normal']
+        style.font.name = 'Batang'
+        style.font.size = Pt(11)
+
+        # HTML 파싱
+        soup = BeautifulSoup(html_content, "html.parser")
+        body = soup.body if soup.body else soup
+        
+        # 1. 문서 대제목
+        title_para = doc.add_paragraph()
+        title_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        title_run = title_para.add_run(f"< {title} >")
+        title_run.bold = True
+        title_run.font.size = Pt(18)
+        doc.add_paragraph() # 한 줄 띔
+
+        # 자식 노드 순회하며 라인 분류 및 렌더링
+        for child in body.children:
+            if isinstance(child, str):
+                text = child.strip()
+                if not text:
+                    continue
+                p = doc.add_paragraph()
+                p.add_run(text)
+                continue
+                
+            if child.name == "br":
+                doc.add_paragraph() # 빈 줄
+                continue
+
+            text = child.get_text().strip()
+            html_str = str(child)
+            
+            if not text:
+                continue
+
+            is_scene = "***" in html_str or "***" in text
+
+            if is_scene:
+                clean_text = text.replace("***", "").strip()
+                p = doc.add_paragraph()
+                p.paragraph_format.space_before = Pt(14)
+                p.paragraph_format.space_after = Pt(6)
+                run = p.add_run(clean_text)
+                run.bold = True
+                run.underline = True
+                continue
+
+            # 대사 감지 (인물명: 대사)
+            dialogue_match = re.match(r"^([^\s:(]+)(?:\s*\(([^)]+)\))?\s*[:：]\s*(.*)$", text)
+            if not dialogue_match:
+                # 탭 공백 구분 대사 감지 (예: 인물명 + 2칸 이상의 공백 + 대사)
+                dialogue_match = re.match(r"^([^\s(]{1,5})(?:\s*\(([^)]+)\))?\s{2,}(.*)$", text)
+
+            if dialogue_match:
+                char_name = dialogue_match.group(1).strip()
+                parenthetical = dialogue_match.group(2).strip() if dialogue_match.group(2) else None
+                dialogue_text = dialogue_match.group(3).strip()
+
+                p = doc.add_paragraph()
+                p.paragraph_format.space_before = Pt(2)
+                p.paragraph_format.space_after = Pt(2)
+                
+                # 정밀 대사 정렬: 왼쪽 여백 1.5인치, 첫 줄 내어쓰기 1.5인치
+                p.paragraph_format.left_indent = Inches(1.5)
+                p.paragraph_format.first_line_indent = Inches(-1.5)
+                
+                # 인물명 및 괄호 지문 추가
+                char_run = p.add_run(char_name)
+                char_run.bold = True
+                if parenthetical:
+                    p.add_run(f"({parenthetical})")
+                
+                p.add_run("\t") # 탭 문자로 대사 시작점 이동
+                p.add_run(dialogue_text)
+                continue
+
+            # 일반 지문
+            p = doc.add_paragraph()
+            p.paragraph_format.space_before = Pt(4)
+            p.paragraph_format.space_after = Pt(4)
+            p.add_run(text)
+
+        target = io.BytesIO()
+        doc.save(target)
+        target.seek(0)
+        return target
+
+    def generate_script_pdf(self, title: str, html_content: str) -> io.BytesIO:
+        """대본 HTML을 파싱하여 정교한 A4 규격의 PDF 문서를 생성합니다."""
+        from bs4 import BeautifulSoup
+        import re
+        from reportlab.platypus import Table, TableStyle, PageBreak
+
+        logger.info(f"Generating script PDF for: {title}")
+        buffer = io.BytesIO()
+        doc = SimpleDocTemplate(
+            buffer,
+            rightMargin=54, leftMargin=54,
+            topMargin=54, bottomMargin=54
+        )
+
+        font_name = "KoreanFont" if loaded_font else "Helvetica"
+        styles = getSampleStyleSheet()
+
+        title_style = ParagraphStyle(
+            name="ScriptTitle",
+            parent=styles['Heading1'],
+            fontName=font_name,
+            fontSize=22,
+            leading=28,
+            alignment=1, # Center
+            spaceAfter=25,
+            textColor=colors.HexColor("#000000")
+        )
+
+        scene_style = ParagraphStyle(
+            name="ScriptScene",
+            parent=styles['Normal'],
+            fontName=font_name,
+            fontSize=11,
+            leading=16,
+            spaceBefore=14,
+            spaceAfter=6,
+            textColor=colors.HexColor("#000000")
+        )
+
+        char_style = ParagraphStyle(
+            name="ScriptChar",
+            parent=styles['Normal'],
+            fontName=font_name,
+            fontSize=10.5,
+            leading=14,
+            textColor=colors.HexColor("#000000")
+        )
+
+        dialogue_style = ParagraphStyle(
+            name="ScriptDialogue",
+            parent=styles['Normal'],
+            fontName=font_name,
+            fontSize=10.5,
+            leading=15,
+            textColor=colors.HexColor("#000000")
+        )
+
+        action_style = ParagraphStyle(
+            name="ScriptAction",
+            parent=styles['Normal'],
+            fontName=font_name,
+            fontSize=10.5,
+            leading=15,
+            spaceBefore=4,
+            spaceAfter=4,
+            textColor=colors.HexColor("#222222")
+        )
+
+        story = []
+
+        # 1. 문서 제목
+        story.append(Spacer(1, 20))
+        story.append(Paragraph(f"&lt; {title} &gt;", title_style))
+        story.append(Spacer(1, 15))
+
+        # HTML 파싱
+        soup = BeautifulSoup(html_content, "html.parser")
+        body = soup.body if soup.body else soup
+
+        for child in body.children:
+            if isinstance(child, str):
+                text = child.strip()
+                if not text:
+                    continue
+                story.append(Paragraph(text, action_style))
+                continue
+
+            if child.name == "br":
+                story.append(Spacer(1, 10))
+                continue
+
+            text = child.get_text().strip()
+            html_str = str(child)
+
+            if not text:
+                continue
+
+            is_scene = "***" in html_str or "***" in text
+
+            if is_scene:
+                clean_text = text.replace("***", "").strip()
+                # 씬 헤더는 밑줄과 볼드를 적용하여 Paragraph로 렌더링
+                story.append(Paragraph(f"<u><b>{clean_text}</b></u>", scene_style))
+                continue
+
+            # 대사 감지
+            dialogue_match = re.match(r"^([^\s:(]+)(?:\s*\(([^)]+)\))?\s*[:：]\s*(.*)$", text)
+            if not dialogue_match:
+                dialogue_match = re.match(r"^([^\s(]{1,5})(?:\s*\(([^)]+)\))?\s{2,}(.*)$", text)
+
+            if dialogue_match:
+                char_name = dialogue_match.group(1).strip()
+                parenthetical = dialogue_match.group(2).strip() if dialogue_match.group(2) else None
+                dialogue_text = dialogue_match.group(3).strip()
+
+                # 인물명 및 괄호 지문 구성
+                char_html = f"<b>{char_name}</b>"
+                if parenthetical:
+                    char_html += f"<br/><font color='gray' size='9'>({parenthetical})</font>"
+
+                char_p = Paragraph(char_html, char_style)
+                dialogue_p = Paragraph(dialogue_text, dialogue_style)
+
+                # 테두리 없는 2열 테이블로 대사 가로 정렬 (인물명 85, 대사 395)
+                t = Table([[char_p, dialogue_p]], colWidths=[85, 395])
+                t.setStyle(TableStyle([
+                    ('VALIGN', (0,0), (-1,-1), 'TOP'),
+                    ('LEFTPADDING', (0,0), (-1,-1), 0),
+                    ('RIGHTPADDING', (0,0), (-1,-1), 0),
+                    ('BOTTOMPADDING', (0,0), (-1,-1), 2),
+                    ('TOPPADDING', (0,0), (-1,-1), 2),
+                ]))
+                story.append(t)
+                continue
+
+            # 일반 지문
+            story.append(Paragraph(text, action_style))
+
+        # PDF 빌드
+        doc.build(story)
+        buffer.seek(0)
+        return buffer

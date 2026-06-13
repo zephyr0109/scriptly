@@ -87,6 +87,7 @@ class Source(DomainModel):
     tension_reason: Optional[str] = None
     analysis_status: AnalysisStatus = Field(default=AnalysisStatus.PENDING)
     published_at: Optional[datetime] = None
+    folder: Optional[str] = None
     ingested_at: datetime = Field(default_factory=datetime.now)
     updated_at: datetime = Field(default_factory=datetime.now)
     source_metadata: Dict[str, Any] = Field(default_factory=dict)

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { Search, Archive, Plus, X, FileText, Sparkles, Wind, CheckCircle2, Loader2 } from "lucide-react";
 import { cn, API_BASE_URL } from "@/lib/utils";
 
@@ -34,10 +34,23 @@ const ArchiveImportModal = ({ isOpen, onClose, onImport, isDarkMode, existingSou
     finally { setIsLoading(false); }
   };
 
-  const filteredSources = sources.filter(s => 
-    s.title.toLowerCase().includes(search.toLowerCase()) || 
-    s.summary?.toLowerCase().includes(search.toLowerCase())
-  );
+  const [selectedFolder, setSelectedFolder] = useState("all");
+
+  const folders = useMemo(() => {
+    const fromSources = Array.from(
+      new Set(sources.map((s) => s.folder).filter(Boolean))
+    ) as string[];
+    return fromSources.sort();
+  }, [sources]);
+
+  const filteredSources = sources.filter(s => {
+    const matchesSearch = s.title.toLowerCase().includes(search.toLowerCase()) || 
+                          s.summary?.toLowerCase().includes(search.toLowerCase());
+    
+    if (selectedFolder === "all") return matchesSearch;
+    if (selectedFolder === "unclassified") return matchesSearch && (!s.folder || s.folder.trim() === "");
+    return matchesSearch && s.folder === selectedFolder;
+  });
 
   const toggleSelect = (id: string) => {
     setSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
@@ -89,6 +102,46 @@ const ArchiveImportModal = ({ isOpen, onClose, onImport, isDarkMode, existingSou
           </div>
         </div>
 
+        {/* Folder Filter Chips */}
+        <div className="px-10 py-3.5 border-b dark:border-zinc-900/60 flex items-center gap-2 overflow-x-auto select-none custom-scrollbar-horizontal shrink-0">
+          <button
+            onClick={() => setSelectedFolder("all")}
+            className={cn(
+              "px-3 py-1.5 rounded-lg text-[10px] font-black shrink-0 transition-all active:scale-95 border",
+              selectedFolder === "all"
+                ? "bg-indigo-600 text-white border-indigo-500 shadow"
+                : (isDarkMode ? "bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-white" : "bg-white border-zinc-200 text-zinc-650 hover:bg-zinc-50")
+            )}
+          >
+            📁 전체보기
+          </button>
+          <button
+            onClick={() => setSelectedFolder("unclassified")}
+            className={cn(
+              "px-3 py-1.5 rounded-lg text-[10px] font-black shrink-0 transition-all active:scale-95 border",
+              selectedFolder === "unclassified"
+                ? "bg-indigo-600 text-white border-indigo-500 shadow"
+                : (isDarkMode ? "bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-white" : "bg-white border-zinc-200 text-zinc-650 hover:bg-zinc-50")
+            )}
+          >
+            📂 미분류
+          </button>
+          {folders.map(f => (
+            <button
+              key={f}
+              onClick={() => setSelectedFolder(f)}
+              className={cn(
+                "px-3 py-1.5 rounded-lg text-[10px] font-black shrink-0 transition-all active:scale-95 border",
+                selectedFolder === f
+                  ? "bg-indigo-600 text-white border-indigo-500 shadow"
+                  : (isDarkMode ? "bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-white" : "bg-white border-zinc-200 text-zinc-650 hover:bg-zinc-50")
+              )}
+            >
+              📁 {f}
+            </button>
+          ))}
+        </div>
+ 
         {/* Sources Grid/List */}
         <div className={cn(
           "flex-1 overflow-y-auto p-10 grid grid-cols-2 gap-6 items-start content-start",

@@ -63,6 +63,7 @@ class SourceModel(Base):
     analysis_status = Column(String(50), default=AnalysisStatus.PENDING.value)
     
     published_at = Column(DateTime(timezone=True), nullable=True)
+    folder = Column(String(100), nullable=True)
     source_metadata = Column(JSON, default=dict)
     
     ingested_at = Column(DateTime(timezone=True), server_default=func.now())

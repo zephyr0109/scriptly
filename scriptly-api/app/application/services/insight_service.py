@@ -435,6 +435,7 @@ class InsightService:
                         source_node_id=source_char.id,
                         target_node_id=target_char.id,
                         label=relation_label,
+                        style={"type": "relationshipEdge", "strokeWidth": 2, "stroke": "#a1a1aa"},
                         data={"label": relation_label, "description": description, "curvature": 0}
                     )
                     db_session.add(db_edge)
@@ -445,6 +446,7 @@ class InsightService:
                         "target": str(target_char.id),
                         "type": "relationshipEdge", # 프론트엔드의 커스텀 엣지 타입
                         "label": relation_label,
+                        "reconnectable": True,
                         "data": {"label": relation_label, "description": description, "curvature": 0},
                         "style": {"strokeWidth": 2, "stroke": "#a1a1aa"}
                     })

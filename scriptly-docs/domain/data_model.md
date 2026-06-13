@@ -43,6 +43,7 @@
   - `ingested_at`: 시스템 수집일
   - `updated_at`: 수정일
   - `metadata`: JSON (파일 경로, 원본 매체명 등)
+  - `folder`: String (NULL 허용, 소속 폴더명)
 
 ### D. DramaticElement (드라마적 요소)
 `Source`로부터 AI가 추출한 핵심 서사 단위입니다.

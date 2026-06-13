@@ -8,7 +8,8 @@ import {
   addEdge, 
   Connection, 
   useReactFlow,
-  ReactFlowProvider
+  ReactFlowProvider,
+  reconnectEdge
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { Plus, Sparkles, Save, X, Layers, Trash2, Edit2, Info, Loader2 } from "lucide-react";
@@ -28,7 +29,8 @@ const edgeTypes = {
 
 const edgeOptions = {
   type: 'relationshipEdge',
-  style: { strokeWidth: 2, stroke: '#3b82f6' }, // 기본 파란색 계열 매칭
+  style: { strokeWidth: 2, stroke: '#a1a1aa' }, // 자동생성 선과 색상을 일치시키기 위해 회색(#a1a1aa)으로 통일
+  reconnectable: true,
 };
 
 interface CharacterMapDualViewProps {
@@ -85,6 +87,7 @@ function CharacterMapDualViewInner({
       ...params,
       id: getUUID(),
       ...edgeOptions,
+      reconnectable: true,
       data: { 
         label: "관계", 
         description: "",
@@ -94,6 +97,14 @@ function CharacterMapDualViewInner({
     };
     setEdges((eds: any) => addEdge(newEdge, eds));
   }, [setEdges, isDarkMode]);
+
+  // Edge 재연결 설정
+  const onReconnect = useCallback(
+    (oldEdge: any, newConnection: Connection) => {
+      setEdges((els: any) => reconnectEdge(oldEdge, newConnection, els));
+    },
+    [setEdges]
+  );
 
   // 관계 설정 변경 실시간 동기화
   useEffect(() => {
@@ -281,10 +292,16 @@ function CharacterMapDualViewInner({
           <button 
             onClick={() => setShowConfirmModal(true)}
             disabled={isSyncing}
-            className="px-4 py-2.5 text-xs font-black bg-gradient-to-r from-orange-600 to-amber-500 text-white rounded-xl transition-all shadow-md active:scale-95 flex items-center gap-1.5 disabled:opacity-50 hover:brightness-110"
+            className={cn(
+              "px-4 py-2.5 text-xs font-black rounded-xl transition-all shadow-sm active:scale-95 flex items-center gap-1.5 border",
+              isDarkMode 
+                ? "bg-indigo-950/20 border-indigo-900/40 text-indigo-400 hover:bg-indigo-900/20" 
+                : "bg-indigo-50 border-indigo-100 text-indigo-600 hover:bg-indigo-100",
+              isSyncing && "opacity-50 cursor-not-allowed"
+            )}
             title="기사 분석 내용을 기반으로 인물 관계도 초안 자동 생성"
           >
-            {isSyncing ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
+            {isSyncing ? <Loader2 size={13} className="animate-spin" /> : <Sparkles size={13} />}
             <span>AI Support</span>
           </button>
           
@@ -482,6 +499,7 @@ function CharacterMapDualViewInner({
             onNodesChange={onNodesChange}
             onEdgesChange={onEdgesChange}
             onConnect={onConnect}
+            onReconnect={onReconnect}
             onNodesDelete={onNodesDelete}
             onEdgesDelete={onEdgesDelete}
             nodeTypes={nodeTypes}
@@ -491,6 +509,8 @@ function CharacterMapDualViewInner({
             colorMode={isDarkMode ? 'dark' : 'light'}
             className="bg-transparent"
             deleteKeyCode={['Backspace', 'Delete']}
+            edgesReconnectable={true}
+            connectionLineStyle={{ stroke: '#a1a1aa', strokeWidth: 2 }}
           >
             <Background color={isDarkMode ? "#333" : "#ddd"} gap={24} size={2} />
             <Controls className={cn(

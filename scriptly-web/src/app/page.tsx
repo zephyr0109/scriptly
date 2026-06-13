@@ -103,7 +103,12 @@ export default function IntegratedPrototype() {
     handleUpdateNote,
     handleDownloadFile,
     handleReanalyze,
-    handleDeleteArchiveItem
+    handleDeleteArchiveItem,
+    localFolders,
+    handleCreateLocalFolder,
+    handleMoveToFolder,
+    handleRenameFolder,
+    handleDeleteFolder
   } = useArchive();
 
   // 4. 큐레이션 기사 검색(Curation) 실 데이터 Custom Hook 연동
@@ -1321,16 +1326,12 @@ export default function IntegratedPrototype() {
               {inspirationSubTab === "archive" && (
                 <div className="flex-grow flex flex-col min-w-0 overflow-hidden">
                   <ArchiveFilterGrid 
-                    filteredAndSortedArchives={computedArchives.map(item => ({
-                      id: item.id,
-                      title: item.title || "수집 파일",
-                      desc: item.type === "NOTE" ? item.content : (cleanHtml(item.summary || item.content).substring(0, 120) + (cleanHtml(item.summary || item.content) ? "..." : "")),
-                      type: item.type === "NOTE" ? "✍️ 직접 메모" : item.type === "NEWS" ? "🔗 뉴스기사" : "📁 문서파일",
-                      rawType: item.type,
-                      tension_score: item.tension_score,
-                      analysis_status: item.analysis_status,
-                      date: new Date(item.ingested_at || item.created_at).toISOString().split("T")[0]
-                    }))} 
+                    rawArchiveItems={archiveItems}
+                    localFolders={localFolders}
+                    handleCreateLocalFolder={handleCreateLocalFolder}
+                    handleMoveToFolder={handleMoveToFolder}
+                    handleRenameFolder={handleRenameFolder}
+                    handleDeleteFolder={handleDeleteFolder}
                     addToast={addToast}
                     selectArchive={(id) => {
                       selectArchive(id);
@@ -1353,6 +1354,8 @@ export default function IntegratedPrototype() {
                         });
                       }
                     }}
+                    archiveFilter={archiveFilter}
+                    archiveSort={archiveSort}
                   />
                 </div>
               )}

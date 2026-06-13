@@ -136,8 +136,9 @@ export function useInsightLab(isDarkMode: boolean) {
               id: e.id,
               source: e.source_node_id,
               target: e.target_node_id,
-              type: type || 'smoothstep',
+              type: type || 'relationshipEdge',
               animated: !!animated,
+              reconnectable: true,
               style: { strokeWidth: 2, stroke: '#a1a1aa', ...cssStyle }
             };
             if (sourceHandle) edge.sourceHandle = sourceHandle;
@@ -316,7 +317,12 @@ export function useInsightLab(isDarkMode: boolean) {
       const result = response.data;
       if (result.nodes && result.edges) {
         setNodes(result.nodes.map((n: any) => ({ ...n, data: { ...n.data, isDarkMode } })));
-        setEdges(result.edges.map((e: any) => ({ ...e, data: { ...e.data, isDarkMode } })));
+        setEdges(result.edges.map((e: any) => ({ 
+          ...e, 
+          type: e.type || 'relationshipEdge',
+          reconnectable: true,
+          data: { ...e.data, isDarkMode } 
+        })));
         await fetchCharacters(projectId);
       }
     } catch (e: any) {

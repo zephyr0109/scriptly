@@ -7,7 +7,7 @@ import uuid
 import logging
 import httpx
 from bs4 import BeautifulSoup
-from typing import List
+from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, BackgroundTasks, Body
 from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -283,3 +283,68 @@ async def update_note_source(
     background_tasks.add_task(process_source_analysis, source.id)
     
     return Source.model_validate(source)
+
+
+class SourceFolderUpdateRequest(BaseModel):
+    folder: Optional[str] = None
+
+class FolderRenameRequest(BaseModel):
+    old_name: str
+    new_name: str
+
+class FolderDeleteRequest(BaseModel):
+    folder_name: str
+
+@router.patch("/source/{source_id}/folder", response_model=Source)
+async def update_source_folder(
+    source_id: uuid.UUID,
+    request: SourceFolderUpdateRequest,
+    current_user: UserModel = Depends(AuthService.get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """영감의 폴더 분류를 업데이트합니다."""
+    source = await get_source_for_user(source_id, current_user, db)
+    source.folder = request.folder
+    await db.commit()
+    await db.refresh(source)
+    return Source.model_validate(source)
+
+@router.put("/folder/rename")
+async def rename_folder(
+    request: FolderRenameRequest,
+    current_user: UserModel = Depends(AuthService.get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """특정 사용자의 영감 폴더명을 일괄 변경합니다."""
+    if not request.old_name.strip():
+        raise HTTPException(status_code=400, detail="Old folder name cannot be empty")
+    
+    from sqlalchemy import update
+    stmt = update(SourceModel).where(
+        SourceModel.user_id == current_user.id,
+        SourceModel.folder == request.old_name
+    ).values(folder=request.new_name)
+    
+    await db.execute(stmt)
+    await db.commit()
+    return {"status": "success", "message": f"Folder renamed from {request.old_name} to {request.new_name}"}
+
+@router.post("/folder/delete")
+async def delete_folder(
+    request: FolderDeleteRequest,
+    current_user: UserModel = Depends(AuthService.get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """특정 폴더를 삭제하고, 해당 폴더 내 영감들을 미분류(folder=None)로 이동시킵니다."""
+    if not request.folder_name.strip():
+        raise HTTPException(status_code=400, detail="Folder name cannot be empty")
+        
+    from sqlalchemy import update
+    stmt = update(SourceModel).where(
+        SourceModel.user_id == current_user.id,
+        SourceModel.folder == request.folder_name
+    ).values(folder=None)
+    
+    await db.execute(stmt)
+    await db.commit()
+    return {"status": "success", "message": f"Folder '{request.folder_name}' deleted. Sources moved to unclassified."}

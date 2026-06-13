@@ -7,7 +7,8 @@ import {
   Connection, 
   MarkerType,
   useReactFlow,
-  ReactFlowProvider
+  ReactFlowProvider,
+  reconnectEdge
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { 
@@ -32,6 +33,7 @@ const edgeTypes = {
 const edgeOptions = {
   type: 'relationshipEdge',
   style: { strokeWidth: 2, stroke: '#a1a1aa' },
+  reconnectable: true,
 };
 
 interface CharacterBoardProps {
@@ -74,6 +76,7 @@ const CharacterBoardInner = ({
       ...params,
       id: getUUID(),
       ...edgeOptions,
+      reconnectable: true,
       data: { 
         label: "관계", 
         description: "",
@@ -83,6 +86,14 @@ const CharacterBoardInner = ({
     };
     setEdges((eds: any) => addEdge(newEdge, eds));
   }, [setEdges, isDarkMode]);
+
+  // Edge 재연결 설정
+  const onReconnect = useCallback(
+    (oldEdge: any, newConnection: Connection) => {
+      setEdges((els: any) => reconnectEdge(oldEdge, newConnection, els));
+    },
+    [setEdges]
+  );
 
   // 캐릭터 관리 액션
   const handleSync = async () => {
@@ -299,6 +310,7 @@ const CharacterBoardInner = ({
             onNodesChange={onNodesChange}
             onEdgesChange={onEdgesChange}
             onConnect={onConnect}
+            onReconnect={onReconnect}
             onNodesDelete={onNodesDelete}
             onEdgesDelete={onEdgesDelete}
             onDragOver={onDragOver}
@@ -309,6 +321,8 @@ const CharacterBoardInner = ({
             colorMode={isDarkMode ? 'dark' : 'light'}
             className="bg-transparent"
             deleteKeyCode={['Backspace', 'Delete']}
+            edgesReconnectable={true}
+            connectionLineStyle={{ stroke: '#a1a1aa', strokeWidth: 2 }}
           >
             <Background color={isDarkMode ? "#333" : "#ddd"} gap={24} size={2} />
             <Controls className={cn("!border-none !p-1 !rounded-xl !shadow-lg", isDarkMode ? "!bg-zinc-900 border !border-zinc-800" : "!bg-white border !border-zinc-100")} />

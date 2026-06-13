@@ -158,3 +158,44 @@ async def delete_script(
     await db.delete(db_obj)
     await db.commit()
     return None
+
+@router.get("/{script_id}/export")
+async def export_script(
+    script_id: uuid.UUID,
+    format: str,
+    current_user: UserModel = Depends(AuthService.get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    대본 내보내기 (Word/PDF)
+    
+    지정한 형식(format)에 맞게 대본 데이터를 docx 또는 pdf 파일로 인코딩하여 즉시 다운로드 응답을 리턴합니다.
+    """
+    script = await get_script_for_user(script_id, current_user, db)
+    
+    from app.application.services.export_service import ExportService
+    export_service = ExportService()
+    
+    if format.lower() in ["word", "docx"]:
+        file_stream = export_service.generate_script_docx(script.title, script.content)
+        filename = f"{script.title}.docx"
+        media_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    elif format.lower() == "pdf":
+        file_stream = export_service.generate_script_pdf(script.title, script.content)
+        filename = f"{script.title}.pdf"
+        media_type = "application/pdf"
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, 
+            detail="지원하지 않는 내보내기 포맷입니다."
+        )
+        
+    import urllib.parse
+    from fastapi.responses import StreamingResponse
+    
+    encoded_filename = urllib.parse.quote(filename)
+    headers = {
+        "Content-Disposition": f"attachment; filename*=UTF-8''{encoded_filename}"
+    }
+    return StreamingResponse(file_stream, media_type=media_type, headers=headers)
+

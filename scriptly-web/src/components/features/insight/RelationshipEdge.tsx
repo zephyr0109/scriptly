@@ -2,7 +2,7 @@ import React, { useState, useRef, useCallback } from 'react';
 import { 
   BaseEdge, 
   EdgeLabelRenderer, 
-  getBezierPath, 
+  getStraightPath, 
   type EdgeProps,
   useReactFlow
 } from '@xyflow/react';
@@ -41,17 +41,11 @@ export default function RelationshipEdge({
   const movedRef = useRef(false);
   const [localOffset, setLocalOffset] = useState(edgeData?.labelOffset || { x: 0, y: 0 });
 
-  // 곡률 (사용자가 직선을 원하므로 기본값을 0으로 변경)
-  const curvature = edgeData?.curvature !== undefined ? edgeData.curvature : 0;
-
-  const [edgePath, labelX, labelY] = getBezierPath({
+  const [edgePath, labelX, labelY] = getStraightPath({
     sourceX,
     sourceY,
-    sourcePosition,
     targetX,
     targetY,
-    targetPosition,
-    curvature,
   });
 
   const onMouseDown = (evt: React.MouseEvent) => {
@@ -131,7 +125,7 @@ export default function RelationshipEdge({
     <>
       <BaseEdge path={edgePath} markerEnd={markerEnd} style={{
         ...style,
-        stroke: selected ? (isDarkMode ? '#6366f1' : '#4f46e5') : (style.stroke || '#a1a1aa'),
+        stroke: selected ? (isDarkMode ? '#6366f1' : '#4f46e5') : '#a1a1aa',
         strokeWidth: selected ? 3 : 2,
         transition: isDragging ? 'none' : 'all 0.2s'
       }} />

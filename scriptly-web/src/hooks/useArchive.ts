@@ -131,6 +131,68 @@ export function useArchive() {
     }
   };
 
+  const [localFolders, setLocalFolders] = useState<string[]>([]);
+
+  useEffect(() => {
+    const saved = localStorage.getItem("archive_local_folders");
+    if (saved) {
+      try {
+        setLocalFolders(JSON.parse(saved));
+      } catch (e) {
+        console.error(e);
+      }
+    }
+  }, []);
+
+  const handleCreateLocalFolder = useCallback((name: string) => {
+    setLocalFolders(prev => {
+      if (prev.includes(name)) return prev;
+      const next = [...prev, name];
+      localStorage.setItem("archive_local_folders", JSON.stringify(next));
+      return next;
+    });
+  }, []);
+
+  const handleMoveToFolder = async (id: string, folder: string | null, onSuccess?: () => void, onFailure?: (msg: string) => void) => {
+    try {
+      await api.patch(`/archive/source/${id}/folder`, { folder });
+      if (onSuccess) onSuccess();
+      fetchArchiveItems();
+    } catch (e: any) {
+      if (onFailure) onFailure(e.response?.data?.detail || "폴더 이동 실패");
+    }
+  };
+
+  const handleRenameFolder = async (oldName: string, newName: string, onSuccess?: () => void, onFailure?: (msg: string) => void) => {
+    try {
+      await api.put(`/archive/folder/rename`, { old_name: oldName, new_name: newName });
+      setLocalFolders(prev => {
+        const next = prev.map(f => f === oldName ? newName : f);
+        localStorage.setItem("archive_local_folders", JSON.stringify(next));
+        return next;
+      });
+      if (onSuccess) onSuccess();
+      fetchArchiveItems();
+    } catch (e: any) {
+      if (onFailure) onFailure(e.response?.data?.detail || "폴더 이름 수정 실패");
+    }
+  };
+
+  const handleDeleteFolder = async (folderName: string, onSuccess?: () => void, onFailure?: (msg: string) => void) => {
+    try {
+      await api.post(`/archive/folder/delete`, { folder_name: folderName });
+      setLocalFolders(prev => {
+        const next = prev.filter(f => f !== folderName);
+        localStorage.setItem("archive_local_folders", JSON.stringify(next));
+        return next;
+      });
+      if (onSuccess) onSuccess();
+      fetchArchiveItems();
+    } catch (e: any) {
+      if (onFailure) onFailure(e.response?.data?.detail || "폴더 삭제 실패");
+    }
+  };
+
   return {
     archiveItems,
     selectedArchiveIndex, setSelectedArchiveIndex,
@@ -144,6 +206,11 @@ export function useArchive() {
     handleDownloadFile,
     handleReanalyze,
     handleDeleteArchiveItem,
-    selectedArchiveItem: selectedArchiveIndex !== null ? archiveItems[selectedArchiveIndex] : null
+    selectedArchiveItem: selectedArchiveIndex !== null ? archiveItems[selectedArchiveIndex] : null,
+    localFolders,
+    handleCreateLocalFolder,
+    handleMoveToFolder,
+    handleRenameFolder,
+    handleDeleteFolder
   };
 }

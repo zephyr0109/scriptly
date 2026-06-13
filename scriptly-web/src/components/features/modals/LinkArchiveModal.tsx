@@ -1,7 +1,7 @@
 "use client";
 
-import React from "react";
-import { X } from "lucide-react";
+import React, { useState, useMemo } from "react";
+import { X, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useUIStore } from "@/store/useUIStore";
 
@@ -23,6 +23,28 @@ export default function LinkArchiveModal({
   addToast
 }: LinkArchiveModalProps) {
   const { isDarkMode } = useUIStore();
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedFolder, setSelectedFolder] = useState("all");
+
+  const folders = useMemo(() => {
+    const fromItems = archiveItems
+      .map(item => item.folder)
+      .filter((f): f is string => typeof f === "string" && f.trim() !== "");
+    return Array.from(new Set(fromItems)).sort();
+  }, [archiveItems]);
+
+  const filteredItems = useMemo(() => {
+    return archiveItems.filter(item => {
+      const q = searchQuery.toLowerCase();
+      const matchesSearch = item.title.toLowerCase().includes(q) || 
+                            (item.content && item.content.toLowerCase().includes(q)) ||
+                            (item.summary && item.summary.toLowerCase().includes(q));
+      
+      if (selectedFolder === "all") return matchesSearch;
+      if (selectedFolder === "unclassified") return matchesSearch && (!item.folder || item.folder.trim() === "");
+      return matchesSearch && item.folder === selectedFolder;
+    });
+  }, [archiveItems, searchQuery, selectedFolder]);
 
   if (!isOpen) return null;
 
@@ -36,8 +58,65 @@ export default function LinkArchiveModal({
           </button>
         </div>
 
-        <div className="p-6 overflow-y-auto max-h-[300px] flex flex-col gap-2.5 custom-scrollbar-dark select-none">
-          {archiveItems.map(item => {
+        {/* Search & Folder filters inside Modal */}
+        <div className="p-6 pb-2 border-b border-zinc-800/40 flex flex-col gap-4">
+          <div className="relative w-full">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" size={14} />
+            <input 
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="영감 제목, 내용 검색..."
+              className="w-full pl-9 pr-7 py-2 bg-zinc-900 border border-zinc-800 rounded-xl text-xs font-semibold text-white outline-none focus:border-indigo-500/50"
+            />
+            {searchQuery && (
+              <button onClick={() => setSearchQuery("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-white">
+                <X size={12} />
+              </button>
+            )}
+          </div>
+          
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 select-none custom-scrollbar-horizontal w-full">
+            <button
+              onClick={() => setSelectedFolder("all")}
+              className={cn(
+                "px-2.5 py-1 rounded-lg text-[9px] font-black shrink-0 transition-all border",
+                selectedFolder === "all"
+                  ? "bg-indigo-600 text-white border-indigo-500 shadow"
+                  : "bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-white"
+              )}
+            >
+              전체
+            </button>
+            <button
+              onClick={() => setSelectedFolder("unclassified")}
+              className={cn(
+                "px-2.5 py-1 rounded-lg text-[9px] font-black shrink-0 transition-all border",
+                selectedFolder === "unclassified"
+                  ? "bg-indigo-600 text-white border-indigo-500 shadow"
+                  : "bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-white"
+              )}
+            >
+              미분류
+            </button>
+            {folders.map(f => (
+              <button
+                key={f}
+                onClick={() => setSelectedFolder(f)}
+                className={cn(
+                  "px-2.5 py-1 rounded-lg text-[9px] font-black shrink-0 transition-all border",
+                  selectedFolder === f
+                    ? "bg-indigo-600 text-white border-indigo-500 shadow"
+                    : "bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-white"
+                )}
+              >
+                📁 {f}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="p-6 overflow-y-auto max-h-[260px] flex flex-col gap-2.5 custom-scrollbar-dark select-none">
+          {filteredItems.map(item => {
             const isLinked = projectLinkedInspirations.includes(item.id);
             return (
               <div 

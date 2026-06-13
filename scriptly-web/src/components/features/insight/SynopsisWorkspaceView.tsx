@@ -1,7 +1,8 @@
 "use client";
 
-import React from "react";
 import { Loader2, Sparkles } from "lucide-react";
+import { useUIStore } from "@/store/useUIStore";
+import { cn } from "@/lib/utils";
 
 /**
  * SynopsisWorkspaceView 컴포넌트의 Props 인터페이스 정의
@@ -37,6 +38,7 @@ export default function SynopsisWorkspaceView({
   handleSaveSynopsis,
   handleExportDocument
 }: SynopsisWorkspaceViewProps) {
+  const { isDarkMode } = useUIStore();
   return (
     <div className="flex-grow overflow-y-auto custom-scrollbar-dark p-8 flex flex-col gap-6 select-none h-full min-h-0 animate-in fade-in duration-350">
       
@@ -57,7 +59,7 @@ export default function SynopsisWorkspaceView({
             className="px-5 py-2.5 text-xs font-black bg-amber-500 hover:bg-amber-400 text-black rounded-xl transition-all shadow-md active:scale-95 cursor-pointer flex items-center gap-1.5"
             title="작성한 시놉시스(로그라인 및 전체 줄거리)를 데이터베이스에 저장합니다."
           >
-            <span>시놉시스 저장 완료</span>
+            <span>시놉시스 저장</span>
           </button>
 
           <button 
@@ -147,7 +149,13 @@ export default function SynopsisWorkspaceView({
               <button 
                 onClick={handleGenerateLogline}
                 disabled={isGeneratingSynopsis}
-                className="px-3 py-1.5 text-[9px] font-black text-indigo-400 bg-indigo-950/20 border border-indigo-900/30 hover:bg-indigo-900/20 rounded-lg flex items-center gap-1 active:scale-95 transition-all cursor-pointer disabled:opacity-50"
+                className={cn(
+                  "px-3 py-1.5 text-[9px] font-black rounded-lg transition-all shadow-sm active:scale-95 flex items-center gap-1 border",
+                  isDarkMode 
+                    ? "bg-indigo-950/20 border-indigo-900/40 text-indigo-400 hover:bg-indigo-900/20" 
+                    : "bg-indigo-50 border-indigo-100 text-indigo-600 hover:bg-indigo-100",
+                  isGeneratingSynopsis && "opacity-50 cursor-not-allowed"
+                )}
               >
                 {isGeneratingSynopsis ? (
                   <Loader2 size={10} className="animate-spin" />
@@ -174,7 +182,13 @@ export default function SynopsisWorkspaceView({
               <button 
                 onClick={handleGenerateSynopsis}
                 disabled={isGeneratingSynopsis}
-                className="px-3 py-1.5 text-[9px] font-black text-indigo-400 bg-indigo-950/20 border border-indigo-900/30 hover:bg-indigo-900/20 rounded-lg flex items-center gap-1 active:scale-95 transition-all cursor-pointer disabled:opacity-50"
+                className={cn(
+                  "px-3 py-1.5 text-[9px] font-black rounded-lg transition-all shadow-sm active:scale-95 flex items-center gap-1 border",
+                  isDarkMode 
+                    ? "bg-indigo-950/20 border-indigo-900/40 text-indigo-400 hover:bg-indigo-900/20" 
+                    : "bg-indigo-50 border-indigo-100 text-indigo-600 hover:bg-indigo-100",
+                  isGeneratingSynopsis && "opacity-50 cursor-not-allowed"
+                )}
               >
                 {isGeneratingSynopsis ? (
                   <Loader2 size={10} className="animate-spin" />

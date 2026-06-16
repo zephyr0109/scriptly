@@ -17,6 +17,7 @@ interface CharacterModalProps {
   charAge: string;
   charGender: string;
   charOccupation: string;
+  charIsLocked: boolean;
   setCharacterForm: (form: any) => void;
   handleSaveCharacter: () => Promise<void>;
   deleteCharacter: (id: string) => Promise<boolean>;
@@ -35,6 +36,7 @@ export default function CharacterModal({
   charAge,
   charGender,
   charOccupation,
+  charIsLocked,
   setCharacterForm,
   handleSaveCharacter,
   deleteCharacter,
@@ -145,6 +147,20 @@ export default function CharacterModal({
               placeholder="예: 법 앞의 절대 평등과 사회 정의 실현" 
               className="w-full bg-zinc-900 border border-zinc-800 text-xs font-bold text-white px-4 py-2.5 rounded-xl outline-none focus:border-amber-500/50" 
             />
+          </div>
+
+          {/* 캐릭터 고정 여부 */}
+          <div className="flex items-center gap-2.5 py-1 px-1 bg-zinc-950/40 border border-zinc-900 rounded-2xl p-3 mt-1">
+            <input 
+              type="checkbox"
+              id="charIsLocked" 
+              checked={charIsLocked}
+              onChange={(e) => setCharacterForm({ isLocked: e.target.checked })}
+              className="w-4 h-4 rounded border-zinc-800 bg-zinc-900 text-amber-500 focus:ring-0 outline-none cursor-pointer"
+            />
+            <label htmlFor="charIsLocked" className="text-xs font-bold text-zinc-400 cursor-pointer flex items-center gap-1.5 select-none hover:text-white transition-all">
+              📌 인물 고정 (관계도 자동 분석 시 유지)
+            </label>
           </div>
 
           {/* 상세 기술 */}

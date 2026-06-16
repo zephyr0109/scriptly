@@ -78,7 +78,7 @@ export default function IntegratedPrototype() {
     
     // 캐릭터 폼 상태
     activeCharacterId, charName, charRole, charDesc, charDesire, charColor,
-    charAge, charGender, charOccupation,
+    charAge, charGender, charOccupation, charIsLocked,
     setCharacterForm, resetCharacterForm,
 
     // 플롯 사건 폼 상태
@@ -614,7 +614,8 @@ export default function IntegratedPrototype() {
       color: char.color || "bg-blue-500/20 text-blue-400 border-blue-500/50",
       age: char.age || "",
       gender: char.gender || "",
-      occupation: char.occupation || ""
+      occupation: char.occupation || "",
+      isLocked: char.is_locked || false
     });
     setModalOpen("character", true);
   };
@@ -633,7 +634,8 @@ export default function IntegratedPrototype() {
       color: charColor || "bg-blue-500/20 text-blue-400 border-blue-500/50",
       age: charAge,
       gender: charGender,
-      occupation: charOccupation
+      occupation: charOccupation,
+      is_locked: charIsLocked
     };
 
     if (activeCharacterId) {
@@ -1193,10 +1195,10 @@ export default function IntegratedPrototype() {
                 
                 {[
                   { id: "info", label: "프로젝트 정보", icon: Info, color: "text-blue-400" },
+                  { id: "world", label: "세계관 설정", icon: Globe, color: "text-cyan-400" },
                   { id: "characters", label: "캐릭터 맵", icon: Users, color: "text-emerald-400" },
                   { id: "plot", label: "플롯 이벤트", icon: GitCommit, color: "text-purple-400" },
-                  { id: "draft", label: "초안 & 시놉시스", icon: FileText, color: "text-pink-400" },
-                  { id: "world", label: "세계관 설정", icon: Globe, color: "text-cyan-400" },
+                  { id: "draft", label: "초안 & 시놉시스", icon: FileText, color: "text-pink-400" },                  
                   { id: "editor", label: "대본 작성기", icon: PenTool, color: "text-amber-400" }                  
                 ].map(menu => {
                   const isSelected = activeWorkspaceTab === menu.id;
@@ -1625,6 +1627,7 @@ export default function IntegratedPrototype() {
         charAge={charAge}
         charGender={charGender}
         charOccupation={charOccupation}
+        charIsLocked={charIsLocked}
         setCharacterForm={setCharacterForm}
         handleSaveCharacter={handleSaveCharacter}
         deleteCharacter={deleteCharacter}
@@ -1700,7 +1703,7 @@ export default function IntegratedPrototype() {
                             next[idx] = next[idx - 1];
                             next[idx - 1] = temp;
                             setProjects(next);
-                            addToast("기획안 우선순위 배열이 조정되었습니다.", "success");
+                            
                           }}
                           className="p-0.5 hover:bg-zinc-800 rounded text-zinc-500 hover:text-zinc-200 disabled:opacity-30 disabled:hover:bg-transparent"
                         >
@@ -1714,7 +1717,6 @@ export default function IntegratedPrototype() {
                             next[idx] = next[idx + 1];
                             next[idx + 1] = temp;
                             setProjects(next);
-                            addToast("기획안 우선순위 배열이 조정되었습니다.", "success");
                           }}
                           className="p-0.5 hover:bg-zinc-800 rounded text-zinc-500 hover:text-zinc-200 disabled:opacity-30 disabled:hover:bg-transparent"
                         >

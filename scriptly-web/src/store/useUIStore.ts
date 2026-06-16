@@ -34,6 +34,7 @@ interface UIState {
   charAge: string;
   charGender: string;
   charOccupation: string;
+  charIsLocked: boolean;
 
   // 5.5 플롯 사건 추가/수정 폼 임시 상태
   activePlotEventId: string | null;       // null 이면 등록, string 이면 수정 모드
@@ -55,7 +56,7 @@ interface UIState {
   selectInspiration: (id: string | null) => void;
   selectArchive: (id: string | null) => void;
   setModalOpen: (modal: "collect" | "project" | "linkArchive" | "character" | "plotEvent", open: boolean) => void;
-  setCharacterForm: (form: Partial<{ id: string | null; name: string; role: string; desc: string; desire: string; color: string; age: string; gender: string; occupation: string }>) => void;
+  setCharacterForm: (form: Partial<{ id: string | null; name: string; role: string; desc: string; desire: string; color: string; age: string; gender: string; occupation: string; isLocked: boolean }>) => void;
   resetCharacterForm: () => void;
   setPlotEventForm: (form: Partial<{ id: string | null; title: string; timeHint: string; content: string; characterIds: string[] }>) => void;
   resetPlotEventForm: () => void;
@@ -91,6 +92,7 @@ export const useUIStore = create<UIState>((set) => ({
   charAge: "",
   charGender: "",
   charOccupation: "",
+  charIsLocked: false,
 
   activePlotEventId: null,
   plotEventTitle: "",
@@ -128,6 +130,7 @@ export const useUIStore = create<UIState>((set) => ({
     charAge: form.age !== undefined ? form.age : state.charAge,
     charGender: form.gender !== undefined ? form.gender : state.charGender,
     charOccupation: form.occupation !== undefined ? form.occupation : state.charOccupation,
+    charIsLocked: form.isLocked !== undefined ? form.isLocked : state.charIsLocked,
   })),
   resetCharacterForm: () => set({
     activeCharacterId: null,
@@ -139,6 +142,7 @@ export const useUIStore = create<UIState>((set) => ({
     charAge: "",
     charGender: "",
     charOccupation: "",
+    charIsLocked: false,
   }),
   setPlotEventForm: (form) => set((state) => ({
     activePlotEventId: form.id !== undefined ? form.id : state.activePlotEventId,

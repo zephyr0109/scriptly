@@ -5,7 +5,10 @@ FROM ghcr.io/astral-sh/uv:python3.12-alpine
 WORKDIR /app
 
 # Install system dependencies (Korean fonts for PDF generation)
-RUN apk add --no-cache font-noto-cjk
+# font-noto-cjk는 TTC 내부 PostScript(CFF) 아웃라인 문제로 ReportLab 로드에 실패하므로, TTF 형식의 NanumGothic을 직접 내려받아 배치합니다.
+RUN apk add --no-cache ca-certificates wget \
+    && mkdir -p /usr/share/fonts/truetype/nanum \
+    && wget -qO /usr/share/fonts/truetype/nanum/NanumGothic.ttf https://github.com/google/fonts/raw/main/ofl/nanumgothic/NanumGothic-Regular.ttf
 
 # Enable bytecode compilation
 ENV UV_COMPILE_BYTECODE=1

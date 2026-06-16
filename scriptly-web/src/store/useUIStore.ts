@@ -4,7 +4,7 @@ interface UIState {
   // 1. 최외곽 라우팅 및 캔버스 스위칭
   activeActivity: "inspiration" | "workspace";
   inspirationSubTab: "search" | "archive";
-  activeWorkspaceTab: "info" | "characters" | "plot" | "draft" | "editor";
+  activeWorkspaceTab: "info" | "characters" | "plot" | "draft" | "editor" | "world";
   
   // 2. 패널 및 레이아웃 상태
   isRightPanelOpen: boolean;
@@ -45,7 +45,7 @@ interface UIState {
   // 6. 액션 함수
   setActivity: (activity: "inspiration" | "workspace") => void;
   setInspirationSubTab: (tab: "search" | "archive") => void;
-  setWorkspaceTab: (tab: "info" | "characters" | "plot" | "draft" | "editor") => void;
+  setWorkspaceTab: (tab: "info" | "characters" | "plot" | "draft" | "editor" | "world") => void;
   toggleRightPanel: () => void;
   setRightPanelOpen: (open: boolean) => void;
   setDarkMode: (dark: boolean) => void;

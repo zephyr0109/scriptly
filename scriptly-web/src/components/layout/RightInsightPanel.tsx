@@ -4,7 +4,7 @@ import React, { useState } from "react";
 import { 
   Sparkles, ShieldAlert, ArrowRight, Flame, UserCheck, CheckSquare, 
   Bookmark, ChevronDown, ChevronRight, BookmarkCheck, ExternalLink, RefreshCw,
-  Compass, HelpCircle, Archive, Check, BookOpenCheck, X
+  Compass, HelpCircle, Archive, Check, BookOpenCheck, X, Plus
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useUIStore } from "@/store/useUIStore";
@@ -475,15 +475,16 @@ export default function RightInsightPanel({
       {/* B. [대메뉴: 작업 공간] 일 때 우측 패널 -> 프로젝트 연동 참고 책장(Reference Shelf) 모드 */}
       {activeActivity === "workspace" && focusedInspiration === null && (
         <div className="flex-1 flex flex-col gap-6 p-6 min-h-0">
-          <div className="flex items-center justify-between border-b border-zinc-800/20 pb-4">
+          <div className="flex flex-col gap-3 border-b border-zinc-800/20 pb-4">
             <div className="flex items-center gap-2">
               <BookmarkCheck size={16} className="text-amber-500" />
-              <span className="text-xs font-black tracking-wide text-white">📚 프로젝트 참고 책장 (Inspiration Shelf)</span>
+              <span className="text-sm font-black tracking-wide text-white">📚 프로젝트 참고 책장</span>
             </div>
             <button 
               onClick={() => setModalOpen("linkArchive", true)}
-              className="px-2 py-1 bg-amber-500/10 border border-amber-500/25 hover:bg-amber-500/20 text-amber-400 text-[10px] font-black rounded-lg transition-all"
+              className="w-full py-2.5 bg-amber-500/10 border border-amber-500/25 hover:bg-amber-500/20 text-amber-400 text-[11px] font-black rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer"
             >
+              <Plus size={12} />
               영감 불러오기
             </button>
           </div>

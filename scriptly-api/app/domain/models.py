@@ -220,3 +220,78 @@ class ScriptModel(Base):
     
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+class WorldStageModel(Base):
+    """시공간 무대 엔티티"""
+    __tablename__ = "world_stages"
+
+    id = Column(PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    project_id = Column(PG_UUID(as_uuid=True), ForeignKey("projects.id", ondelete="CASCADE"), nullable=False)
+    name = Column(String(255), nullable=False)
+    era = Column(String(100), nullable=True)
+    parent_id = Column(PG_UUID(as_uuid=True), nullable=True) # Soft Relation
+    description = Column(Text, nullable=True)
+    atmosphere = Column(Text, nullable=True)
+    technology_level = Column(String(255), nullable=True)
+    
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+class WorldFactionModel(Base):
+    """세력/집단 엔티티"""
+    __tablename__ = "world_factions"
+
+    id = Column(PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    project_id = Column(PG_UUID(as_uuid=True), ForeignKey("projects.id", ondelete="CASCADE"), nullable=False)
+    name = Column(String(255), nullable=False)
+    type = Column(String(100), nullable=True)
+    ideology_goal = Column(Text, nullable=True)
+    base_stage_id = Column(PG_UUID(as_uuid=True), nullable=True) # Soft Relation
+    scale_status = Column(Text, nullable=True)
+    hierarchy = Column(Text, nullable=True)
+    description = Column(Text, nullable=True)
+    
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+class WorldRuleCultureModel(Base):
+    """사회 제도 / 문화 관습 엔티티"""
+    __tablename__ = "world_rules_cultures"
+
+    id = Column(PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    project_id = Column(PG_UUID(as_uuid=True), ForeignKey("projects.id", ondelete="CASCADE"), nullable=False)
+    name = Column(String(255), nullable=False)
+    type = Column(String(50), nullable=False) # 'RULE', 'CULTURE'
+    scope_stage_id = Column(PG_UUID(as_uuid=True), nullable=True) # Soft Relation
+    scope_faction_id = Column(PG_UUID(as_uuid=True), nullable=True) # Soft Relation
+    content = Column(Text, nullable=True)
+    impact = Column(Text, nullable=True)
+    exceptions = Column(Text, nullable=True)
+    
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+class WorldGlossaryModel(Base):
+    """작품 용어 사전 엔티티"""
+    __tablename__ = "world_glossary"
+
+    id = Column(PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    project_id = Column(PG_UUID(as_uuid=True), ForeignKey("projects.id", ondelete="CASCADE"), nullable=False)
+    term = Column(String(255), nullable=False)
+    definition = Column(Text, nullable=True)
+    usage_example = Column(Text, nullable=True)
+    
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+class WorldNoteModel(Base):
+    """세계관 자유 메모 엔티티"""
+    __tablename__ = "world_notes"
+
+    id = Column(PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    project_id = Column(PG_UUID(as_uuid=True), ForeignKey("projects.id", ondelete="CASCADE"), nullable=False)
+    title = Column(String(255), nullable=False)
+    content = Column(Text, nullable=True)
+    
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())

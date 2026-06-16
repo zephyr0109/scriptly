@@ -7,7 +7,7 @@ import {
   PenTool, Settings, LogOut, ChevronRight, ChevronDown, Eye, EyeOff,
   Sun, Moon, Search, Trash2, CornerDownRight, Check, Save, 
   HelpCircle, ArrowRight, Filter, ExternalLink, Upload, Globe, File, Calendar, SortAsc, X, Flame, ShieldAlert,
-  Compass, Bookmark, BookmarkCheck, RefreshCw, Loader2
+  Compass, Bookmark, BookmarkCheck, RefreshCw, Loader2, FolderPlus
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -20,6 +20,7 @@ import PlotTimeline from "@/components/features/insight/PlotTimeline";
 import ScriptEditor from "@/components/features/editor/ScriptEditor";
 import ProjectInfo from "@/components/features/insight/ProjectInfo";
 import SynopsisWorkspaceView from "@/components/features/insight/SynopsisWorkspaceView";
+import WorldBuildingView from "@/components/features/world/WorldBuildingView";
 
 // 신규 리팩토링 모달/토스트 컴포넌트 임포트
 import CollectModal from "@/components/features/modals/CollectModal";
@@ -950,17 +951,26 @@ export default function IntegratedPrototype() {
           </button>
           
           <button 
-            onClick={() => addToast("설정 패널은 정식 오픈 버전에서 활성화됩니다.", "info")}
+            onClick={() => {
+              logout();
+              router.push("/login");
+            }}
+            title="로그아웃"
             className={cn(
-              "w-10 h-10 rounded-lg flex items-center justify-center transition-all",
-              isDarkMode ? "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-900" : "text-zinc-500 hover:text-zinc-900 hover:bg-zinc-200"
+              "w-10 h-10 rounded-lg flex items-center justify-center transition-all hover:bg-rose-500/10 text-zinc-500 hover:text-rose-500",
+              isDarkMode ? "hover:bg-rose-500/10" : "hover:bg-rose-500/10"
             )}
           >
-            <Settings size={18} />
+            <LogOut size={18} />
           </button>
 
-          <div className="w-9 h-9 rounded-full bg-zinc-700/60 border border-zinc-500/30 overflow-hidden flex items-center justify-center shadow-md active:scale-95 transition-all">
-            <span className="text-xs font-bold text-amber-500">작가</span>
+          <div 
+            title={user?.full_name || user?.email || "작가님"}
+            className="w-9 h-9 rounded-full bg-zinc-700/60 border border-zinc-500/30 overflow-hidden flex items-center justify-center shadow-md active:scale-95 transition-all"
+          >
+            <span className="text-xs font-bold text-amber-500">
+              {user?.full_name ? user.full_name.substring(0, 2) : (user?.email ? user.email.substring(0, 2) : "작가")}
+            </span>
           </div>
         </div>
       </aside>
@@ -1186,7 +1196,8 @@ export default function IntegratedPrototype() {
                   { id: "characters", label: "캐릭터 맵", icon: Users, color: "text-emerald-400" },
                   { id: "plot", label: "플롯 이벤트", icon: GitCommit, color: "text-purple-400" },
                   { id: "draft", label: "초안 & 시놉시스", icon: FileText, color: "text-pink-400" },
-                  { id: "editor", label: "대본 작성기", icon: PenTool, color: "text-amber-400" }
+                  { id: "world", label: "세계관 설정", icon: Globe, color: "text-cyan-400" },
+                  { id: "editor", label: "대본 작성기", icon: PenTool, color: "text-amber-400" }                  
                 ].map(menu => {
                   const isSelected = activeWorkspaceTab === menu.id;
                   return (
@@ -1211,30 +1222,6 @@ export default function IntegratedPrototype() {
                   );
                 })}
               </div>
-
-              {activeWorkspaceTab === "editor" && (
-                <div className="mt-4 border-t border-zinc-800/40 pt-4 flex flex-col gap-2 animate-in fade-in duration-300">
-                  <div className="flex items-center justify-between px-2">
-                    <span className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">OUTLINE (실시간 파싱)</span>
-                    <span className="text-[9px] bg-amber-500/10 text-amber-400 px-1.5 py-0.5 rounded font-black">{outline.length} Scenes</span>
-                  </div>
-                  <div className="flex flex-col gap-1 max-h-[200px] overflow-y-auto custom-scrollbar-dark p-1">
-                    {outline.map((scene) => (
-                      <div 
-                        key={scene.id}
-                        onClick={() => addToast(`선택된 '${scene.title}'로 에디터 스크롤을 이동(시뮬레이션)합니다.`, "info")}
-                        className={cn(
-                          "flex items-center gap-2 p-2 rounded-lg text-[11px] cursor-pointer hover:bg-zinc-800/30 transition-all min-w-0 group",
-                          isDarkMode ? "text-zinc-400 hover:text-zinc-200" : "text-zinc-600 hover:text-zinc-900"
-                        )}
-                      >
-                        <CornerDownRight size={10} className="text-zinc-600 group-hover:text-amber-500" />
-                        <span className="truncate font-medium">{scene.title}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
             </div>
           </div>
         )}
@@ -1269,6 +1256,7 @@ export default function IntegratedPrototype() {
                   {activeWorkspaceTab === "plot" && "플롯 타임라인"}
                   {activeWorkspaceTab === "draft" && "AI 초안 & 시놉시스"}
                   {activeWorkspaceTab === "editor" && "대본 작성기 (Markdown)"}
+                  {activeWorkspaceTab === "world" && "세계관 설정"}
                 </span>
               </>
             )}
@@ -1364,96 +1352,125 @@ export default function IntegratedPrototype() {
 
           {activeActivity === "workspace" && (
             <div className="flex-1 flex overflow-hidden animate-in fade-in duration-300">
-              
-              {activeWorkspaceTab === "info" && (
-                <ProjectInfo
-                  currentProject={currentProject}
-                  editProjectTitle={editProjectTitle}
-                  setEditProjectTitle={setEditProjectTitle}
-                  editProjectGenre={editProjectGenre}
-                  setEditProjectGenre={setEditProjectGenre}
-                  formatSelectMode={formatSelectMode}
-                  setFormatSelectMode={setFormatSelectMode}
-                  customFormat={customFormat}
-                  setCustomFormat={setCustomFormat}
-                  editProjectAtmosphere={editProjectAtmosphere}
-                  setEditProjectAtmosphere={setEditProjectAtmosphere}
-                  editProjectIntendedPurpose={editProjectIntendedPurpose}
-                  setEditProjectIntendedPurpose={setEditProjectIntendedPurpose}
-                  editProjectCoreConflict={editProjectCoreConflict}
-                  setEditProjectCoreConflict={setEditProjectCoreConflict}
-                  editProjectTheme={editProjectTheme}
-                  setEditProjectTheme={setEditProjectTheme}
-                  editProjectLogline={editProjectLogline}
-                  setEditProjectLogline={setEditProjectLogline}
-                  handleSaveProjectInfo={handleSaveProjectInfo}
-                />
-              )}
+              {!selectedProjectId ? (
+                <div className="flex-1 flex flex-col items-center justify-center p-8 bg-[#0D0D12] text-center border-l border-zinc-900/60">
+                  <div className="relative mb-6 p-6 rounded-3xl bg-zinc-950 border border-zinc-800/80 shadow-2xl flex items-center justify-center">
+                    <div className="absolute inset-0 bg-purple-500/5 rounded-3xl blur-xl" />
+                    <FolderPlus className="w-16 h-16 text-purple-400 relative z-10 animate-pulse" />
+                  </div>
+                  <h2 className="text-xl font-black text-white mb-2">진행 중인 극작 프로젝트가 없습니다</h2>
+                  <p className="text-sm text-zinc-500 max-w-md mb-8 leading-relaxed">
+                    새로운 이야기의 첫발을 떼어보세요. 프로젝트를 생성하시면 시놉시스 기획, 인물 관계도 매핑, 대본 집필 등의 다양한 창작 도구들을 즉시 사용할 수 있습니다.
+                  </p>
+                  <button
+                    onClick={() => setModalOpen("project", true)}
+                    className="flex items-center gap-2 px-6 py-3.5 rounded-2xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold text-sm shadow-lg shadow-purple-900/20 hover:scale-[1.02] active:scale-[0.98] transition-all"
+                  >
+                    <Plus size={16} />
+                    새 극작 프로젝트 시작하기
+                  </button>
+                </div>
+              ) : (
+                <>
+                  {activeWorkspaceTab === "info" && (
+                    <ProjectInfo
+                      currentProject={currentProject}
+                      editProjectTitle={editProjectTitle}
+                      setEditProjectTitle={setEditProjectTitle}
+                      editProjectGenre={editProjectGenre}
+                      setEditProjectGenre={setEditProjectGenre}
+                      formatSelectMode={formatSelectMode}
+                      setFormatSelectMode={setFormatSelectMode}
+                      customFormat={customFormat}
+                      setCustomFormat={setCustomFormat}
+                      editProjectAtmosphere={editProjectAtmosphere}
+                      setEditProjectAtmosphere={setEditProjectAtmosphere}
+                      editProjectIntendedPurpose={editProjectIntendedPurpose}
+                      setEditProjectIntendedPurpose={setEditProjectIntendedPurpose}
+                      editProjectCoreConflict={editProjectCoreConflict}
+                      setEditProjectCoreConflict={setEditProjectCoreConflict}
+                      editProjectTheme={editProjectTheme}
+                      setEditProjectTheme={setEditProjectTheme}
+                      editProjectLogline={editProjectLogline}
+                      setEditProjectLogline={setEditProjectLogline}
+                      handleSaveProjectInfo={handleSaveProjectInfo}
+                    />
+                  )}
 
-              {activeWorkspaceTab === "characters" && (
-                <CharacterMapDualView 
-                  characters={characters} 
-                  handleOpenCharacterAdd={handleOpenCharacterAdd} 
-                  handleOpenCharacterEdit={handleOpenCharacterEdit} 
-                  syncCharacters={syncCharacters}
-                  deleteCharacter={deleteCharacter}
-                  handleGenerateMapDraft={handleGenerateMapDraft}
-                  project={currentProject}
-                  isDarkMode={isDarkMode}
-                  nodes={nodes}
-                  setNodes={setNodes}
-                  onNodesChange={onNodesChange}
-                  edges={edges}
-                  setEdges={setEdges}
-                  onEdgesChange={onEdgesChange}
-                  handleSaveLabSession={handleSaveLabSession}
-                  addToast={addToast}
-                />
-              )}
+                  {activeWorkspaceTab === "characters" && (
+                    <CharacterMapDualView 
+                      characters={characters} 
+                      handleOpenCharacterAdd={handleOpenCharacterAdd} 
+                      handleOpenCharacterEdit={handleOpenCharacterEdit} 
+                      syncCharacters={syncCharacters}
+                      deleteCharacter={deleteCharacter}
+                      handleGenerateMapDraft={handleGenerateMapDraft}
+                      project={currentProject}
+                      isDarkMode={isDarkMode}
+                      nodes={nodes}
+                      setNodes={setNodes}
+                      onNodesChange={onNodesChange}
+                      edges={edges}
+                      setEdges={setEdges}
+                      onEdgesChange={onEdgesChange}
+                      handleSaveLabSession={handleSaveLabSession}
+                      addToast={addToast}
+                    />
+                  )}
 
-              {activeWorkspaceTab === "plot" && (
-                <PlotTimeline 
-                  events={events}
-                  projectId={selectedProjectId || undefined}
-                  characters={characters}
-                  isGenerating={isGeneratingPlot}
-                  handleOpenEventAdd={handleOpenEventAdd}
-                  handleOpenEventEdit={handleOpenEventEdit}
-                  onDeleteEvent={deleteEvent}
-                  onReorder={reorderEvents}
-                  onGenerateDraft={generatePlotDraft}
-                  addToast={addToast}
-                />
-              )}
+                  {activeWorkspaceTab === "plot" && (
+                    <PlotTimeline 
+                      events={events}
+                      projectId={selectedProjectId || undefined}
+                      characters={characters}
+                      isGenerating={isGeneratingPlot}
+                      handleOpenEventAdd={handleOpenEventAdd}
+                      handleOpenEventEdit={handleOpenEventEdit}
+                      onDeleteEvent={deleteEvent}
+                      onReorder={reorderEvents}
+                      onGenerateDraft={generatePlotDraft}
+                      addToast={addToast}
+                    />
+                  )}
 
-              {activeWorkspaceTab === "draft" && (
-                <SynopsisWorkspaceView
-                  currentProject={currentProject}
-                  characters={characters}
-                  editProjectLogline={editProjectLogline}
-                  setEditProjectLogline={setEditProjectLogline}
-                  editProjectFullSynopsis={editProjectFullSynopsis}
-                  setEditProjectFullSynopsis={setEditProjectFullSynopsis}
-                  isGeneratingSynopsis={isGeneratingSynopsis}
-                  handleGenerateLogline={handleGenerateLogline}
-                  handleGenerateSynopsis={handleGenerateSynopsis}
-                  handleSaveSynopsis={handleSaveSynopsis}
-                  handleExportDocument={handleExportDocument}
-                />
-              )}
+                  {activeWorkspaceTab === "draft" && (
+                    <SynopsisWorkspaceView
+                      currentProject={currentProject}
+                      characters={characters}
+                      editProjectLogline={editProjectLogline}
+                      setEditProjectLogline={setEditProjectLogline}
+                      editProjectFullSynopsis={editProjectFullSynopsis}
+                      setEditProjectFullSynopsis={setEditProjectFullSynopsis}
+                      isGeneratingSynopsis={isGeneratingSynopsis}
+                      handleGenerateLogline={handleGenerateLogline}
+                      handleGenerateSynopsis={handleGenerateSynopsis}
+                      handleSaveSynopsis={handleSaveSynopsis}
+                      handleExportDocument={handleExportDocument}
+                    />
+                  )}
 
-              {activeWorkspaceTab === "editor" && (
-                <ScriptEditor 
-                  projectId={selectedProjectId}
-                  scripts={scripts}
-                  currentScript={currentScript}
-                  setCurrentScript={setCurrentScript}
-                  createScript={createScript}
-                  updateScript={updateScript}
-                  deleteScript={deleteScript}
-                  isLoading={isLoadingScripts}
-                  addToast={addToast} 
-                />
+                  {activeWorkspaceTab === "editor" && (
+                    <ScriptEditor 
+                      projectId={selectedProjectId}
+                      scripts={scripts}
+                      currentScript={currentScript}
+                      setCurrentScript={setCurrentScript}
+                      createScript={createScript}
+                      updateScript={updateScript}
+                      deleteScript={deleteScript}
+                      isLoading={isLoadingScripts}
+                      addToast={addToast} 
+                    />
+                  )}
+
+                  {activeWorkspaceTab === "world" && selectedProjectId && (
+                    <WorldBuildingView 
+                      projectId={selectedProjectId}
+                      isDarkMode={isDarkMode}
+                      addToast={addToast}
+                    />
+                  )}
+                </>
               )}
             </div>
           )}

@@ -2,7 +2,7 @@
 
 import React from "react";
 import { 
-  Sparkles, Archive, Plus, Folder, Info, Users, GitCommit, FileText, ChevronDown 
+  Sparkles, Archive, Plus, Folder, Info, Users, GitCommit, FileText, ChevronDown, Globe 
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useUIStore } from "@/store/useUIStore";
@@ -130,7 +130,8 @@ export default function ExplorerSidebar({ projects, hookSelectProject, addToast 
                 { id: "characters", icon: Users, label: "캐릭터 맵", desc: "좌측 리스트 및 다이어그램 관계도" },
                 { id: "plot", icon: GitCommit, label: "플롯 타임라인", desc: "핵심 극화 사건 타임라인" },
                 { id: "draft", icon: FileText, label: "초안 생성실", desc: "AI 시놉시스 및 트리트먼트" },
-                { id: "editor", icon: FileText, label: "대본 작성기", desc: "Outline 실시간 대본 집필실" }
+                { id: "editor", icon: FileText, label: "대본 작성기", desc: "Outline 실시간 대본 집필실" },
+                { id: "world", icon: Globe, label: "세계관 설정", desc: "시공간 무대, 집단, 규칙 및 문화" }
               ].map(sub => {
                 const isActive = activeWorkspaceTab === sub.id;
                 return (

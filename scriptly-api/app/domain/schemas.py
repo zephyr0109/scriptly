@@ -316,3 +316,129 @@ class ScriptRead(ScriptBase):
     user_id: UUID
     created_at: datetime
     updated_at: datetime
+
+# --- World Settings (World-Building) ---
+
+# 1. World Stage Schemas
+class WorldStageBase(DomainModel):
+    name: str
+    era: Optional[str] = None
+    parent_id: Optional[UUID] = None
+    description: Optional[str] = None
+    atmosphere: Optional[str] = None
+    technology_level: Optional[str] = None
+
+class WorldStageCreate(WorldStageBase):
+    project_id: UUID
+
+class WorldStageUpdate(BaseModel):
+    name: Optional[str] = None
+    era: Optional[str] = None
+    parent_id: Optional[UUID] = None
+    description: Optional[str] = None
+    atmosphere: Optional[str] = None
+    technology_level: Optional[str] = None
+
+class WorldStageRead(WorldStageBase):
+    id: UUID
+    project_id: UUID
+    created_at: datetime
+    updated_at: datetime
+
+
+# 2. World Faction Schemas
+class WorldFactionBase(DomainModel):
+    name: str
+    type: Optional[str] = None
+    ideology_goal: Optional[str] = None
+    base_stage_id: Optional[UUID] = None
+    scale_status: Optional[str] = None
+    hierarchy: Optional[str] = None
+    description: Optional[str] = None
+
+class WorldFactionCreate(WorldFactionBase):
+    project_id: UUID
+
+class WorldFactionUpdate(BaseModel):
+    name: Optional[str] = None
+    type: Optional[str] = None
+    ideology_goal: Optional[str] = None
+    base_stage_id: Optional[UUID] = None
+    scale_status: Optional[str] = None
+    hierarchy: Optional[str] = None
+    description: Optional[str] = None
+
+class WorldFactionRead(WorldFactionBase):
+    id: UUID
+    project_id: UUID
+    created_at: datetime
+    updated_at: datetime
+
+
+# 3. World Rule & Culture Schemas
+class WorldRuleCultureBase(DomainModel):
+    name: str
+    type: str # 'RULE' or 'CULTURE'
+    scope_stage_id: Optional[UUID] = None
+    scope_faction_id: Optional[UUID] = None
+    content: Optional[str] = None
+    impact: Optional[str] = None
+    exceptions: Optional[str] = None
+
+class WorldRuleCultureCreate(WorldRuleCultureBase):
+    project_id: UUID
+
+class WorldRuleCultureUpdate(BaseModel):
+    name: Optional[str] = None
+    type: Optional[str] = None
+    scope_stage_id: Optional[UUID] = None
+    scope_faction_id: Optional[UUID] = None
+    content: Optional[str] = None
+    impact: Optional[str] = None
+    exceptions: Optional[str] = None
+
+class WorldRuleCultureRead(WorldRuleCultureBase):
+    id: UUID
+    project_id: UUID
+    created_at: datetime
+    updated_at: datetime
+
+
+# 4. World Glossary Schemas
+class WorldGlossaryBase(DomainModel):
+    term: str
+    definition: Optional[str] = None
+    usage_example: Optional[str] = None
+
+class WorldGlossaryCreate(WorldGlossaryBase):
+    project_id: UUID
+
+class WorldGlossaryUpdate(BaseModel):
+    term: Optional[str] = None
+    definition: Optional[str] = None
+    usage_example: Optional[str] = None
+
+class WorldGlossaryRead(WorldGlossaryBase):
+    id: UUID
+    project_id: UUID
+    created_at: datetime
+    updated_at: datetime
+
+
+# 5. World Note Schemas
+class WorldNoteBase(DomainModel):
+    title: str
+    content: Optional[str] = None
+
+class WorldNoteCreate(WorldNoteBase):
+    project_id: UUID
+
+class WorldNoteUpdate(BaseModel):
+    title: Optional[str] = None
+    content: Optional[str] = None
+
+class WorldNoteRead(WorldNoteBase):
+    id: UUID
+    project_id: UUID
+    created_at: datetime
+    updated_at: datetime

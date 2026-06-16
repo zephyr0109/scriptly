@@ -1,5 +1,4 @@
 import axios from 'axios';
-import { useAuthStore } from '@/hooks/useAuth';
 
 let API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
@@ -16,13 +15,23 @@ const api = axios.create({
   },
 });
 
-// 요청 인터셉터: 토큰 자동 주입
+// 요청 인터셉터: 토큰 자동 주입 (Zustand 임포트 제거하여 순환 참조 원천 차단)
 api.interceptors.request.use(
   (config) => {
-    // Zustand store에서 토큰 가져오기 (비동기 스토리지 고려 안함)
-    const token = useAuthStore.getState().accessToken;
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
+    if (typeof window !== 'undefined') {
+      try {
+        const authDataStr = localStorage.getItem('scriptly-auth-storage');
+        if (authDataStr) {
+          const authData = JSON.parse(authDataStr);
+          // Zustand persist 구조: state 내부에 accessToken 존재
+          const token = authData.state?.accessToken;
+          if (token) {
+            config.headers.Authorization = `Bearer ${token}`;
+          }
+        }
+      } catch (e) {
+        console.error('Failed to parse auth token from localStorage:', e);
+      }
     }
     return config;
   },
@@ -36,13 +45,15 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      // 로그인 요청(/auth/login)에서 발생한 401 에러는 리다이렉트하지 않고 페이지단에서 에러 처리를 하도록 건너뜁니다.
       const isLoginRequest = error.config?.url?.includes('/auth/login');
       if (!isLoginRequest) {
-        // 인증 만료 또는 유효하지 않은 토큰
-        useAuthStore.getState().logout();
-        // 브라우저 환경인 경우 로그인 페이지로 리다이렉트 유도
+        // 브라우저 환경에서 로컬 스토리지 삭제 및 로그인 리다이렉트
         if (typeof window !== 'undefined') {
+          try {
+            localStorage.removeItem('scriptly-auth-storage');
+          } catch (e) {
+            console.error('Failed to clean auth storage:', e);
+          }
           window.location.href = '/login';
         }
       }

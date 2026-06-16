@@ -1666,7 +1666,7 @@ export default function UIPreviewPage() {
               <div className="p-4 border-b border-zinc-800/20 flex items-center justify-between shrink-0">
                 <div className="flex items-center gap-2">
                   <BookOpenCheck size={14} className="text-amber-500" />
-                  <span className="text-xs font-black tracking-wide">📚 프로젝트 참고 책장 (Reference)</span>
+                  <span className="text-xs font-black tracking-wide">📚 프로젝트 참고 책장</span>
                 </div>
                 <button 
                   onClick={() => setIsRightPanelOpen(false)}

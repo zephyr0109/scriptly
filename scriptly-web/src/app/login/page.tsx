@@ -45,7 +45,6 @@ export default function LoginPage() {
     } catch (err: any) {
       console.error('Login error:', err);
       setError(err.response?.data?.detail || '로그인에 실패했습니다. 이메일과 비밀번호를 확인해주세요.');
-    } finally {
       setIsLoading(false);
     }
   };
@@ -114,6 +113,13 @@ export default function LoginPage() {
                 '로그인'
               )}
             </button>
+
+            {isLoading && (
+              <div className="flex items-center justify-center gap-2 text-slate-500 text-xs pt-1.5 animate-pulse">
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                <span>로그인 진행 중입니다. 잠시만 기다려주세요...</span>
+              </div>
+            )}
           </form>
 
           <div className="mt-8 pt-6 border-t border-slate-100 text-center">

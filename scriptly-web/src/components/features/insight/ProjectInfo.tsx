@@ -1,6 +1,8 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
+import { Download } from "lucide-react";
+import api from "@/lib/api";
 
 /**
  * ProjectInfo 컴포넌트의 Props 인터페이스 정의
@@ -26,6 +28,7 @@ interface ProjectInfoProps {
   editProjectLogline: string;
   setEditProjectLogline: (val: string) => void;
   handleSaveProjectInfo: () => Promise<void>;
+  addToast?: (msg: string, type?: "success" | "info" | "warning" | "error") => void;
 }
 
 /**
@@ -33,6 +36,7 @@ interface ProjectInfoProps {
  * 드라마 기획안 정보 탭(activeWorkspaceTab === "info")의 정보 조회 및 편집을 처리하는 프레젠테이션 컴포넌트입니다.
  */
 export default function ProjectInfo({
+  currentProject,
   editProjectTitle,
   setEditProjectTitle,
   editProjectGenre,
@@ -51,8 +55,40 @@ export default function ProjectInfo({
   setEditProjectTheme,
   editProjectLogline,
   setEditProjectLogline,
-  handleSaveProjectInfo
+  handleSaveProjectInfo,
+  addToast
 }: ProjectInfoProps) {
+  const [isExporting, setIsExporting] = useState(false);
+
+  const handleExportBackup = async () => {
+    if (!currentProject || !currentProject.id) {
+      if (addToast) addToast("내보낼 프로젝트가 선택되지 않았습니다.", "warning");
+      return;
+    }
+    setIsExporting(true);
+    try {
+      if (addToast) addToast("프로젝트 백업 데이터 추출 중...", "info");
+      const resp = await api.get(`/backup/export/${currentProject.id}`);
+      
+      const dataStr = JSON.stringify(resp.data, null, 2);
+      const blob = new Blob([dataStr], { type: "application/json" });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `scriptly_backup_${currentProject.title || 'project'}_${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+      
+      if (addToast) addToast("프로젝트 백업 파일(.json)이 다운로드되었습니다.", "success");
+    } catch (e: any) {
+      console.error("Failed to export project backup:", e);
+      if (addToast) addToast("백업 파일 내보내기에 실패했습니다. 다시 시도해 주세요.", "error");
+    } finally {
+      setIsExporting(false);
+    }
+  };
   return (
     <div className="flex-grow overflow-y-auto custom-scrollbar-dark p-8 flex flex-col gap-6">
       <div className="max-w-2xl flex flex-col gap-5">
@@ -166,8 +202,17 @@ export default function ProjectInfo({
           />
         </div>
 
-        {/* 저장 버튼 */}
-        <div className="flex justify-end mt-2">
+        {/* 저장 및 백업 버튼 */}
+        <div className="flex justify-between items-center mt-4 pt-4 border-t border-zinc-800/60">
+          <button
+            onClick={handleExportBackup}
+            disabled={isExporting || !currentProject}
+            className="flex items-center gap-2 px-4 py-2.5 bg-zinc-900 border border-zinc-800 text-zinc-300 hover:text-white hover:bg-zinc-800 text-xs font-bold rounded-xl transition-all shadow-md active:scale-95 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <Download size={14} />
+            {isExporting ? "백업 추출 중..." : "프로젝트 전체 백업 내보내기 (.json)"}
+          </button>
+          
           <button 
             onClick={handleSaveProjectInfo} 
             className="px-5 py-2.5 bg-amber-500 text-black hover:bg-amber-400 text-xs font-black rounded-xl transition-all shadow-md active:scale-95 cursor-pointer"

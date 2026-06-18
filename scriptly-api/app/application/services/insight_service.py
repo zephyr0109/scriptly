@@ -315,6 +315,16 @@ class InsightService:
             locked_chars_result = await db_session.execute(locked_chars_query)
             locked_chars = locked_chars_result.scalars().all()
             locked_ids = [c.id for c in locked_chars]
+
+            # 세계관 데이터 조회 (무대 및 세력)
+            from app.domain.models import WorldStageModel, WorldFactionModel
+            stages_res = await db_session.execute(select(WorldStageModel).where(WorldStageModel.project_id == project_id))
+            stages = stages_res.scalars().all()
+            stages_context = [{"name": s.name, "era": s.era, "description": s.description} for s in stages]
+
+            factions_res = await db_session.execute(select(WorldFactionModel).where(WorldFactionModel.project_id == project_id))
+            factions = factions_res.scalars().all()
+            factions_context = [{"name": f.name, "type": f.type, "description": f.description} for f in factions]
             
             # 삭제 대상 정리
             # 고정되지 않은 캐릭터 삭제
@@ -347,7 +357,9 @@ class InsightService:
             ai_result = await ai_service.generate_map_draft(
                 project_context=project_context,
                 sources_context=sources_context,
-                fixed_characters=fixed_chars_dict
+                fixed_characters=fixed_chars_dict,
+                stages_context=stages_context,
+                factions_context=factions_context
             )
             
             # 6. 캐릭터 생성 및 매핑

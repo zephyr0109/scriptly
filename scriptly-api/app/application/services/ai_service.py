@@ -215,7 +215,14 @@ class AIService:
             logger.error(f"Error in analyze_synthesis: {e}", exc_info=True)
             raise HTTPException(status_code=500, detail="창작 합성 중 서버 오류가 발생했습니다.")
 
-    async def generate_map_draft(self, project_context: dict, sources_context: List[dict], fixed_characters: List[dict] = None) -> dict:
+    async def generate_map_draft(
+        self, 
+        project_context: dict, 
+        sources_context: List[dict], 
+        fixed_characters: List[dict] = None,
+        stages_context: List[dict] = None,
+        factions_context: List[dict] = None
+    ) -> dict:
         """기획안 및 영감 기반으로 캐릭터 맵 초안 생성 (Phase 7 핵심 기능)"""
         logger.info(f"Executing generate_map_draft for project: {project_context.get('title')}...")
         if not self.client:
@@ -232,9 +239,21 @@ class AIService:
             for c in fixed_characters:
                 fixed_chars_info += f"- {c['name']} ({c['role']}): {c['description']}\n"
 
+        stages_info = ""
+        if stages_context:
+            stages_info = "\n[세계관 시공간 무대 (World Stages)]\n"
+            for st in stages_context:
+                stages_info += f"- {st['name']} ({st.get('era', '시간 미정')}): {st.get('description', '')}\n"
+
+        factions_info = ""
+        if factions_context:
+            factions_info = "\n[세계관 세력/집단 (World Factions)]\n"
+            for fa in factions_context:
+                factions_info += f"- {fa['name']} ({fa.get('type', '유형 미정')}): {fa.get('description', '')}\n"
+
         prompt = f"""
         당신은 베테랑 드라마 작가입니다. 
-        사용자의 [작품 기획안]과 [수집된 영감 자료], 그리고 [고정된 핵심 인물]을 분석하여, 드라마틱하고 개성 넘치는 '인물 관계도 초안'을 완성하세요.
+        사용자의 [작품 기획안]과 [수집된 영감 자료], [세계관 설정(시공간/세력)], 그리고 [고정된 핵심 인물]을 분석하여, 드라마틱하고 개성 넘치는 '인물 관계도 초안'을 완성하세요.
         
         [작품 기획안 Context]
         - 제목: {project_context.get('title')}
@@ -246,10 +265,13 @@ class AIService:
         [영감 자료 Context]
         {sources_info}
         {fixed_chars_info}
+        {stages_info}
+        {factions_info}
         
         [작업 지시사항]
         1. '고정 캐릭터'가 있다면 이들의 설정은 절대 변경하지 마세요. 이들을 중심으로 새로운 인물을 추가하거나 관계를 확장하세요.
-        2. 등장인물은 '고정 캐릭터'를 포함하여 총 4명에서 10명 사이로 구성하세요.
+        2. 제공된 [세계관 시공간 무대] 및 [세계관 세력/집단] 정보를 깊이 있게 활용하여 인물들의 주요 거점, 소속 집단, 신념 체계 등을 캐릭터 상세 기술(description)에 반드시 녹여내세요. (예: 인물 A는 특정 세력에 소속되어 있고, 특정 시공간 무대에서 주로 활약함 등)
+        3. 등장인물은 '고정 캐릭터'를 포함하여 총 4명에서 10명 사이로 구성하세요.
         3. 각 인물은 '역할(role)'을 반드시 가져야 합니다 (역할 종류: 주연, 주조연, 조연, 단역, 카메오).
         4. 관계(relationships)는 두 인물을 잇는 '요약어(relation)'와 '상세 묘사(description)'를 포함해야 합니다.
            - relation: "연인", "적대", "숨겨진 가족" 등 5자 이내의 짧은 카테고리.
@@ -298,7 +320,13 @@ class AIService:
             logger.error(f"Error in generate_map_draft: {e}", exc_info=True)
             raise HTTPException(status_code=500, detail="인물맵 생성 중 서버 오류가 발생했습니다.")
 
-    async def generate_plot_draft(self, project_context: dict, characters_context: List[dict], sources_context: List[dict]) -> dict:
+    async def generate_plot_draft(
+        self, 
+        project_context: dict, 
+        characters_context: List[dict], 
+        sources_context: List[dict],
+        stages_context: List[dict] = None
+    ) -> dict:
         """기획안, 캐릭터, 영감을 기반으로 전체 플롯 타임라인 초안 생성"""
         logger.info(f"Executing generate_plot_draft for project: {project_context.get('title')}...")
         if not self.client:
@@ -318,9 +346,15 @@ class AIService:
             incidents_str = ", ".join(incidents) if incidents else s.get("summary", "상세 정보 없음")
             sources_info += f"- [영감 {i+1}: {s.get('title', '제목 없음')}] 주요 사건/단서: {incidents_str}\n"
 
+        stages_info = ""
+        if stages_context:
+            stages_info = "\n[세계관 시공간 무대 (World Stages)]\n"
+            for st in stages_context:
+                stages_info += f"- {st['name']} ({st.get('era', '시간 미정')}): {st.get('description', '')}\n"
+
         prompt = f"""
         당신은 실력 있는 드라마 작가이자 스토리보드 아티스트입니다. 
-        사용자의 [작품 기획안], [캐릭터 설정], [수집된 영감 자료]를 바탕으로, 드라마틱한 '플롯 타임라인(사건 흐름) 초안'을 작성하세요.
+        사용자의 [작품 기획안], [캐릭터 설정], [수집된 영감 자료], [세계관 시공간 무대 설정]을 바탕으로, 드라마틱한 '플롯 타임라인(사건 흐름) 초안'을 작성하세요.
         
         [작품 기획안 Context]
         - 제목: {project_context.get('title')}
@@ -328,6 +362,9 @@ class AIService:
         - 분위기: {project_context.get('atmosphere')}
         - 핵심 갈등: {project_context.get('core_conflict')}
         - 주제: {project_context.get('theme')}
+        
+        [세계관 시공간 무대 Context]
+        {stages_info}
         
         [캐릭터 Context]
         {chars_info}
@@ -338,7 +375,8 @@ class AIService:
         [작업 지시사항]
         1. 전체 이야기를 관통하는 주요 사건(Events)을 최소 5개에서 최대 12개 사이로 구성하세요.
         2. 각 사건은 반드시 'sequence', 'time_hint', 'title', 'content', 'related_characters'를 포함해야 합니다.
-        3. 'time_hint'는 "오전 10시", "며칠 뒤 밤", "과거 회상", "결말부" 등 자유롭되 직관적인 표현을 사용하세요.
+        3. 제공된 [세계관 시공간 무대] 목록을 적극적으로 참고하여, 각 사건이 발생하는 구체적 위치나 지점(예: '서부지검 특수부', '네오 서울 뒷골목' 등)을 사건의 'title'이나 'content' 본문, 혹은 'time_hint' 정보 내에 녹여내어 공간적 일관성을 확보하세요.
+        4. 'time_hint'는 "오전 10시", "며칠 뒤 밤", "과거 회상", "결말부" 등 자유롭되 직관적인 표현을 사용하세요.
         4. 'content'는 사건의 핵심적인 행동과 대사, 감정적 전환점이 포함되도록 풍부하게 서술하세요.
         5. 'related_characters'는 위 [캐릭터 Context]에 명시된 인물들 중에서 해당 사건에 참여하는 인물들의 '이름'을 리스트 형태로 적으세요.
         6. 전체적인 흐름이 기획안의 '핵심 갈등'과 유기적으로 연결되도록 드라마틱하게 구성하세요.

@@ -125,6 +125,12 @@ class EventService:
             if project.linked_sources:
                 source_res = await db.execute(select(SourceModel).where(SourceModel.id.in_(project.linked_sources)))
                 sources = source_res.scalars().all()
+
+            # 세계관 시공간 무대 정보 조회
+            from app.domain.models import WorldStageModel
+            stages_res = await db.execute(select(WorldStageModel).where(WorldStageModel.project_id == project_id))
+            stages = stages_res.scalars().all()
+            stages_context = [{"name": s.name, "era": s.era, "description": s.description} for s in stages]
                 
             # 2. AI 호출
             project_context = {
@@ -146,7 +152,7 @@ class EventService:
             ]
             
             ai_result = await self.ai_service.generate_plot_draft(
-                project_context, chars_context, sources_context
+                project_context, chars_context, sources_context, stages_context
             )
             
             # 3. 기존 사건 삭제

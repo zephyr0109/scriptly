@@ -1,6 +1,5 @@
 "use client";
-
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { 
   Sparkles, ShieldAlert, ArrowRight, Flame, UserCheck, CheckSquare, 
   Bookmark, ChevronDown, ChevronRight, BookmarkCheck, ExternalLink, RefreshCw,
@@ -8,6 +7,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useUIStore } from "@/store/useUIStore";
+import api from "@/lib/api";
 
 interface RightInsightPanelProps {
   currentInspiration: any;
@@ -50,6 +50,45 @@ export default function RightInsightPanel({
 
   const [focusedInspiration, setFocusedInspiration] = useState<any | null>(null);
   const activeInspiration = focusedInspiration || currentInspiration;
+
+  const [activeTab, setActiveTab] = useState<"content" | "report">("content");
+  const [crawledContent, setCrawledContent] = useState<string>("");
+  const [isCrawling, setIsCrawling] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (!activeInspiration) {
+      setCrawledContent("");
+      return;
+    }
+
+    setActiveTab("content");
+    setCrawledContent("");
+
+    const isNews = activeInspiration.type === "NEWS" || activeInspiration.rawType === "NEWS" || (activeInspiration.url && activeInspiration.url !== "#");
+    const isNote = activeInspiration.type === "NOTE" || activeInspiration.rawType === "NOTE";
+
+    if (isNews && !isNote) {
+      if (activeInspiration.content && activeInspiration.content !== activeInspiration.summary && activeInspiration.content !== activeInspiration.desc) {
+        setCrawledContent(activeInspiration.content);
+        return;
+      }
+
+      const startCrawling = async () => {
+        setIsCrawling(true);
+        try {
+          const response = await api.post(`/news/${activeInspiration.id}/crawl`);
+          setCrawledContent(response.data.content || "");
+        } catch (err) {
+          console.error("Failed to crawl article:", err);
+          setCrawledContent(activeInspiration.summary || activeInspiration.desc || "");
+        } finally {
+          setIsCrawling(false);
+        }
+      };
+
+      startCrawling();
+    }
+  }, [activeInspiration?.id]);
 
   const [openReferenceAccordionId, setOpenReferenceAccordionId] = useState<string | null>("insp_1");
   const [isResizing, setIsResizing] = useState(false);
@@ -225,10 +264,94 @@ export default function RightInsightPanel({
                 )}
               </div>
 
-              {/* AI 극화 분석 결과 리포트 */}
-              <div className="flex flex-col gap-5 border-t border-zinc-800/30 pt-4">
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">AI 극화 분석 리포트</span>
+              {/* 탭 헤더 및 원문/AI 리포트 분기 영역 */}
+              {(() => {
+                const showTabs = activeInspiration && 
+                  activeInspiration.type !== "NOTE" && 
+                  activeInspiration.rawType !== "NOTE" && 
+                  activeInspiration.url && 
+                  activeInspiration.url !== "#";
+                
+                return (
+                  <>
+                    {showTabs && (
+                      <div className="flex border-b border-zinc-800/30 pb-1 mb-2 shrink-0">
+                        <button
+                          onClick={() => setActiveTab("content")}
+                          className={cn(
+                            "flex-1 py-2 text-center text-xs font-black transition-all border-b-2",
+                            activeTab === "content" 
+                              ? "text-amber-500 border-amber-500 font-extrabold" 
+                              : "text-zinc-500 border-transparent hover:text-zinc-300"
+                          )}
+                        >
+                          📰 기사 원문
+                        </button>
+                        <button
+                          onClick={() => setActiveTab("report")}
+                          className={cn(
+                            "flex-1 py-2 text-center text-xs font-black transition-all border-b-2",
+                            activeTab === "report" 
+                              ? "text-amber-500 border-amber-500 font-extrabold" 
+                              : "text-zinc-500 border-transparent hover:text-zinc-300"
+                          )}
+                        >
+                          💡 AI 극화 분석
+                        </button>
+                      </div>
+                    )}
+
+                    {/* 1. 기사 원문 탭 활성화 시 */}
+                    {showTabs && activeTab === "content" && (
+                      <div className="flex flex-col gap-3 min-h-0">
+                        {/* 원문 바로가기 배너 */}
+                        {activeInspiration.url && activeInspiration.url !== "#" && (
+                          <div className={cn(
+                            "flex items-center justify-between text-[10px] font-bold p-3 rounded-xl border shrink-0",
+                            isDarkMode ? "bg-zinc-950/40 border-zinc-800/60 text-zinc-400" : "bg-zinc-100/50 border-zinc-200 text-zinc-600"
+                          )}>
+                            <span className="truncate max-w-[70%]">출처: {activeInspiration.url}</span>
+                            <a 
+                              href={activeInspiration.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex items-center gap-1 text-amber-500 hover:text-amber-400 font-black cursor-pointer shrink-0 transition-colors"
+                            >
+                              <span>원본 기사 읽기</span>
+                              <ExternalLink size={10} />
+                            </a>
+                          </div>
+                        )}
+
+                        {isCrawling ? (
+                          <div className="flex flex-col gap-3 py-4 animate-pulse">
+                            <div className="h-4 bg-zinc-800/60 rounded w-1/3" />
+                            <div className="h-3 bg-zinc-800/40 rounded w-full" />
+                            <div className="h-3 bg-zinc-800/40 rounded w-full" />
+                            <div className="h-3 bg-zinc-800/40 rounded w-4/5" />
+                            <div className="h-3 bg-zinc-800/40 rounded w-full" />
+                            <div className="h-3 bg-zinc-800/40 rounded w-3/4" />
+                            <div className="flex items-center justify-center py-6 gap-2">
+                              <div className="w-4 h-4 border-2 border-amber-500 border-t-transparent rounded-full animate-spin" />
+                              <span className="text-[10px] font-bold text-zinc-500">기사 원문을 불러오는 중...</span>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className={cn(
+                            "p-4 rounded-xl border text-[11px] leading-relaxed font-semibold whitespace-pre-wrap select-text overflow-y-auto max-h-[450px] custom-scrollbar-dark",
+                            isDarkMode ? "bg-zinc-950/20 border-zinc-800/60 text-zinc-300" : "bg-zinc-100/30 border-zinc-200 text-zinc-800"
+                          )}>
+                            {crawledContent || "기사 원문이 비어있거나 불러오지 못했습니다."}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* 2. AI 극화 분석 리포트 탭 활성화 시 (또는 탭 미표시 시) */}
+                    {(!showTabs || activeTab === "report") && (
+                      <div className="flex flex-col gap-5 border-t border-zinc-800/30 pt-4">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">AI 극화 분석 리포트</span>
                   <span className="text-[9px] bg-red-500/10 text-red-400 px-2 py-0.5 rounded font-black">
                     {activeInspiration.keyword || activeInspiration.main_keyword || "갈등자산"}
                   </span>
@@ -411,6 +534,10 @@ export default function RightInsightPanel({
                   </div>
                 )}
               </div>
+            )}
+          </>
+        );
+      })()}
 
               {/* 하단 극작 자산화 제어 버튼 섹션 */}
               <div className="flex flex-col gap-3 border-t border-zinc-800/30 pt-4 shrink-0 mt-auto bg-[#09090C] z-10 sticky bottom-0">

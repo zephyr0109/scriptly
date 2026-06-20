@@ -170,6 +170,7 @@ class NewsStatusInfo(BaseModel):
     tension_reason: Optional[str] = None
     potential_conflict: Optional[str] = None
     detail_analysis: Optional[DetailedAnalysisResult] = None
+    content: Optional[str] = None
 
 class NewsStatusResponse(BaseModel):
     results: List[NewsStatusInfo]

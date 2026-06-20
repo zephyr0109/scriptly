@@ -19,6 +19,11 @@ from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from typing import List
 import uvicorn
+import asyncio
+from datetime import datetime, timedelta
+from sqlalchemy import delete
+from app.infrastructure.database import async_session
+from app.domain.models import ScouterArticleModel
 from app.application.services.curation_service import CurationService
 from app.domain.schemas import CurationResult, NewsArticle, CharacterPersona
 from app.interface.api.v1 import archive, news, insight, projects, characters, events, auth, scripts, world_settings, backup
@@ -33,9 +38,28 @@ async def global_exception_handler(request: Request, exc: Exception):
         content={"detail": "Internal Server Error", "message": str(exc)}
     )
 
+async def cleanup_old_scouter_articles_loop():
+    """3일이 경과한 임시 기사 데이터를 주기적으로 삭제하여 용량을 최적화합니다."""
+    await asyncio.sleep(5)
+    while True:
+        try:
+            logger.info("🧹 Starting Scouter articles cleanup background task...")
+            three_days_ago = datetime.utcnow() - timedelta(days=3)
+            async with async_session() as db:
+                stmt = delete(ScouterArticleModel).where(ScouterArticleModel.ingested_at < three_days_ago)
+                result = await db.execute(stmt)
+                await db.commit()
+                deleted_count = result.rowcount
+                logger.info(f"🧹 Cleaned up {deleted_count} expired scouter articles.")
+        except Exception as e:
+            logger.error(f"🧹 Error during scouter articles cleanup: {e}", exc_info=True)
+        
+        await asyncio.sleep(12 * 3600)
+
 @app.on_event("startup")
 async def startup_event():
     logger.info("⚡ Application startup complete")
+    asyncio.create_task(cleanup_old_scouter_articles_loop())
     # 등록된 라우트 로깅 (디버깅용)
     for route in app.routes:
         logger.info(f"Route: {route.path} -> {route.name}")

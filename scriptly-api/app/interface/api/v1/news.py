@@ -19,6 +19,7 @@ from app.domain.models import ScouterArticleModel, UserModel
 from app.domain.schemas import AnalysisStatus, NewsSearchRequest, NewsStatusResponse, NewsStatusInfo
 from app.application.services.ai_service import AIService
 from app.application.services.auth_service import AuthService
+from app.application.services.crawling_service import CrawlingService
 
 logger = logging.getLogger(__name__)
 
@@ -190,10 +191,22 @@ async def analyze_news_detail(
         raise HTTPException(status_code=404, detail="Article not found")
 
     if article.source_metadata and "detailed_analysis" in article.source_metadata:
-        return article.source_metadata["detailed_analysis"]
+        return {
+            "detailed_analysis": article.source_metadata["detailed_analysis"],
+            "content": article.content
+        }
 
     ai_service = AIService()
     try:
+        is_already_crawled = article.content and article.content != article.summary
+        if not is_already_crawled or len(article.content) < 300:
+            try:
+                crawled_content = await CrawlingService.crawl_article(article.source_url)
+                if crawled_content:
+                    article.content = crawled_content
+            except Exception as crawl_err:
+                logger.warning(f"Auto-crawling failed during analysis for URL: {article.source_url}, using summary fallback. Error: {crawl_err}")
+
         content = article.content or article.summary or article.title
         detail_result = await ai_service.analyze_detail(article.title, content)
         
@@ -204,7 +217,11 @@ async def analyze_news_detail(
         article.analysis_status = AnalysisStatus.COMPLETED.value
         article.source_metadata = new_metadata
         await db.commit()
-        return detail_result
+        
+        return {
+            "detailed_analysis": detail_result,
+            "content": article.content
+        }
     except Exception as e:
         logger.error(f"Detail analysis error: {str(e)}")
         raise HTTPException(status_code=500, detail="AI 분석 오류")
@@ -233,7 +250,43 @@ async def get_analysis_status(
             tension_score=a.tension_score if a.analysis_status == AnalysisStatus.COMPLETED.value else None,
             tension_reason=a.tension_reason if a.analysis_status == AnalysisStatus.COMPLETED.value else None,
             potential_conflict=a.source_metadata.get("potential_conflict") if a.source_metadata else None,
-            detail_analysis=a.source_metadata.get("detailed_analysis") if a.source_metadata else None
+            detail_analysis=a.source_metadata.get("detailed_analysis") if a.source_metadata else None,
+            content=a.content
         )
         response_items.append(info)
     return NewsStatusResponse(results=response_items)
+
+@router.post("/{article_id}/crawl")
+async def crawl_article_content(
+    article_id: UUID,
+    current_user: UserModel = Depends(AuthService.get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """뉴스 기사의 상세 원문을 실시간으로 크롤링하여 ScouterArticleModel.content에 캐싱합니다. (로그인 필수)"""
+    logger.info(f"API Request: crawl_article_content ID: {article_id} by user: {current_user.id}")
+    stmt = select(ScouterArticleModel).where(ScouterArticleModel.id == article_id)
+    result = await db.execute(stmt)
+    article = result.scalars().first()
+
+    if not article:
+        raise HTTPException(status_code=404, detail="Article not found")
+
+    is_already_crawled = article.content and article.content != article.summary
+    if is_already_crawled and len(article.content) > 300:
+        logger.info(f"Article content already cached for ID: {article_id}")
+        return {"content": article.content}
+
+    try:
+        content = await CrawlingService.crawl_article(article.source_url)
+        if content:
+            article.content = content
+            await db.commit()
+            logger.info(f"Successfully crawled and saved content for ID: {article_id}")
+            return {"content": content}
+        else:
+            logger.warning(f"Crawling returned empty text for URL: {article.source_url}, fallback to summary.")
+            return {"content": article.summary}
+    except Exception as e:
+        logger.error(f"Crawling failed for URL: {article.source_url}, error: {str(e)}")
+        return {"content": article.summary}
+

@@ -1,11 +1,12 @@
 "use client";
 
-import React from "react";
+import React, { useState, useRef } from "react";
 import { 
   Search, Filter, SortAsc, Plus, Settings, ChevronDown, ChevronRight, 
-  Info, Users, GitCommit, FileText, PenTool 
+  Info, Users, GitCommit, FileText, PenTool, Upload 
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import api from "@/lib/api";
 
 interface SidebarPanelProps {
   activeActivity: "inspiration" | "workspace";
@@ -34,6 +35,7 @@ interface SidebarPanelProps {
   sidebarWidth: number;
   isDarkMode: boolean;
   addToast: (message: string, type?: "success" | "info" | "warning" | "error") => void;
+  fetchProjects: () => Promise<void>;
 }
 
 export default function SidebarPanel({
@@ -61,8 +63,55 @@ export default function SidebarPanel({
   setIsResizingSidebar,
   sidebarWidth,
   isDarkMode,
-  addToast
+  addToast,
+  fetchProjects
 }: SidebarPanelProps) {
+  const [isImporting, setIsImporting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleImportClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // input 값 초기화
+    e.target.value = "";
+
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      try {
+        const text = event.target?.result as string;
+        const backupData = JSON.parse(text);
+
+        setIsImporting(true);
+        addToast("프로젝트 백업 데이터 업로드 및 복원 중...", "info");
+
+        const resp = await api.post("/backup/import", backupData);
+        if (resp.data && resp.data.new_project_id) {
+          addToast("프로젝트 백업 파일 복원이 완료되었습니다!", "success");
+          
+          // 1. 프로젝트 리스트 갱신
+          await fetchProjects();
+          
+          // 2. 신규 생성된 프로젝트로 활성화 선택
+          const newId = resp.data.new_project_id;
+          selectProject(newId);
+        } else {
+          addToast("프로젝트 복원 결과가 올바르지 않습니다.", "error");
+        }
+      } catch (err: any) {
+        console.error("Failed to restore project backup:", err);
+        addToast("유효한 백업 파일(.json)이 아니거나 복원에 실패했습니다.", "error");
+      } finally {
+        setIsImporting(false);
+      }
+    };
+    reader.readAsText(file);
+  };
+
   return (
     <aside 
       style={{ width: `${sidebarWidth}px` }}
@@ -240,6 +289,14 @@ export default function SidebarPanel({
                 >
                   <Settings size={14} />
                 </button>
+                <button
+                  onClick={handleImportClick}
+                  disabled={isImporting}
+                  className="p-1.5 hover:bg-zinc-800 rounded text-amber-500 hover:text-amber-400 transition-all disabled:opacity-50"
+                  title="백업 파일로 복원하기 (.json)"
+                >
+                  <Upload size={14} className={cn(isImporting && "animate-pulse")} />
+                </button>
                 <button 
                   onClick={() => setModalOpen("project", true)}
                   className="p-1.5 hover:bg-zinc-800 rounded text-amber-500 hover:text-amber-400 transition-all"
@@ -310,6 +367,14 @@ export default function SidebarPanel({
           </div>
         </div>
       )}
+      <input 
+        type="file" 
+        ref={fileInputRef} 
+        onChange={handleFileChange} 
+        style={{ display: "none" }} 
+        accept=".json" 
+      />
     </aside>
+
   );
 }

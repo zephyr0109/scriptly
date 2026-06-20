@@ -22,8 +22,11 @@ RUN uv sync --frozen --no-cache
 # Copy the rest of the application
 COPY . .
 
+# Place the virtual environment's bin directory on the PATH
+ENV PATH="/app/.venv/bin:$PATH"
+
 # Expose port
 EXPOSE 8000
 
-# Run the application
-CMD ["uv", "run", "main.py"]
+# Run the application directly using virtualenv's python to prevent runtime downloads
+CMD ["python", "main.py"]

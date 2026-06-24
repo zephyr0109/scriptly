@@ -1,28 +1,19 @@
 "use client";
 
-import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { 
-  Sparkles, Archive, Folder, Plus, Info, Users, GitCommit, FileText, 
-  PenTool, Settings, LogOut, ChevronRight, ChevronDown, Eye, EyeOff,
-  Sun, Moon, Search, Trash2, CornerDownRight, Check, Save, 
-  HelpCircle, ArrowRight, Filter, ExternalLink, Upload, Globe, File, Calendar, SortAsc, X, Flame, ShieldAlert,
-  Compass, Bookmark, BookmarkCheck, RefreshCw, Loader2, FolderPlus
-} from "lucide-react";
+import { PenTool, Eye, EyeOff, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-// 아토믹 서브 컴포넌트 임포트
+// 레이아웃 컴포넌트 임포트
+import ActivityBar from "@/components/layout/ActivityBar";
+import SidebarPanel from "@/components/layout/SidebarPanel";
+import WorkspaceContainer from "@/components/layout/WorkspaceContainer";
 import RightInsightPanel from "@/components/layout/RightInsightPanel";
 import ScouterGrid from "@/components/features/curation/ScouterGrid";
 import ArchiveFilterGrid from "@/components/features/archive/ArchiveFilterGrid";
-import CharacterMapDualView from "@/components/features/insight/CharacterMapDualView";
-import PlotTimeline from "@/components/features/insight/PlotTimeline";
-import ScriptEditor from "@/components/features/editor/ScriptEditor";
-import ProjectInfo from "@/components/features/insight/ProjectInfo";
-import SynopsisWorkspaceView from "@/components/features/insight/SynopsisWorkspaceView";
-import WorldBuildingView from "@/components/features/world/WorldBuildingView";
 
-// 신규 리팩토링 모달/토스트 컴포넌트 임포트
+// 글로벌 모달 및 공통 컴포넌트 임포트
 import CollectModal from "@/components/features/modals/CollectModal";
 import ProjectCreateModal from "@/components/features/modals/ProjectCreateModal";
 import LinkArchiveModal from "@/components/features/modals/LinkArchiveModal";
@@ -39,71 +30,18 @@ import { useAuthStore } from "@/hooks/useAuth";
 import { useUIStore } from "@/store/useUIStore";
 import api from "@/lib/api";
 
-const cleanHtml = (text: string): string => {
-  if (!text) return "";
-  return text
-    .replace(/<[^>]*>/g, "") // 모든 HTML 태그 영구 척결
-    .replace(/&quot;/g, '"')
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&#39;/g, "'")
-    .trim();
-};
-
+/**
+ * IntegratedPrototype 컴포넌트 (Scriptly 메인 대시보드)
+ * 사용자의 모든 창작 도구와 영감 탐색/분석 데이터를 집약하고 조율하는 최상위 오케스트레이션 페이지입니다.
+ */
 export default function IntegratedPrototype() {
   const [isMounted, setIsMounted] = useState(false);
-  const [isImporting, setIsImporting] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const handleImportClick = () => {
-    fileInputRef.current?.click();
-  };
-
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    // input 값 초기화
-    e.target.value = "";
-
-    const reader = new FileReader();
-    reader.onload = async (event) => {
-      try {
-        const text = event.target?.result as string;
-        const backupData = JSON.parse(text);
-
-        setIsImporting(true);
-        addToast("프로젝트 백업 데이터 업로드 및 복원 중...", "info");
-
-        const resp = await api.post("/backup/import", backupData);
-        if (resp.data && resp.data.new_project_id) {
-          addToast("프로젝트 백업 파일 복원이 완료되었습니다!", "success");
-          
-          // 1. 프로젝트 리스트 갱신
-          await fetchProjects();
-          
-          // 2. 신규 생성된 프로젝트로 활성화 선택
-          const newId = resp.data.new_project_id;
-          selectProject(newId);
-        } else {
-          addToast("프로젝트 복원 결과가 올바르지 않습니다.", "error");
-        }
-      } catch (err: any) {
-        console.error("Failed to restore project backup:", err);
-        addToast("유효한 백업 파일(.json)이 아니거나 복원에 실패했습니다.", "error");
-      } finally {
-        setIsImporting(false);
-      }
-    };
-    reader.readAsText(file);
-  };
 
   useEffect(() => {
     setIsMounted(true);
   }, []);
 
-  // 1. 사용자 인증 및 로그인 가드 복원
+  // 1. 사용자 인증 및 로그인 가드
   const router = useRouter();
   const { user, isAuthenticated, logout, hasHydrated } = useAuthStore();
 
@@ -140,14 +78,12 @@ export default function IntegratedPrototype() {
   const {
     archiveItems,
     selectedArchiveIndex, setSelectedArchiveIndex,
-    selectedSourceIds, setSelectedSourceIds,
     isUploading,
     fetchArchiveItems,
     handleFileUpload,
     handleUrlArchive,
     handleCreateNote,
     handleUpdateNote,
-    handleDownloadFile,
     handleReanalyze,
     handleDeleteArchiveItem,
     localFolders,
@@ -160,8 +96,7 @@ export default function IntegratedPrototype() {
   // 4. 큐레이션 기사 검색(Curation) 실 데이터 Custom Hook 연동
   const {
     searchQuery, setSearchQuery,
-    newsResults, setNewsResults,
-    selectedNewsIndex, setSelectedNewsIndex,
+    newsResults, setSelectedNewsIndex,
     isLoading, isLoadingMore,
     isSaving, currentStart,
     isAnalyzingDetail,
@@ -176,20 +111,17 @@ export default function IntegratedPrototype() {
     projects,
     setProjects,
     currentProject,
-    isLoadingProjects,
     fetchProjects,
     createProject,
     selectProject: hookSelectProject,
     updateProject,
     deleteProject,
-    fetchCharacters,
     createCharacter,
     updateCharacter,
     deleteCharacter,
     characters,
     events,
     isGeneratingPlot,
-    fetchEvents,
     createEvent,
     updateEvent,
     deleteEvent,
@@ -197,7 +129,6 @@ export default function IntegratedPrototype() {
     generatePlotDraft,
     generateLogline,
     generateSynopsis,
-    exportProject,
     isGeneratingSynopsis,
     
     // Scripts 추가 연동
@@ -242,7 +173,7 @@ export default function IntegratedPrototype() {
     }
   }, [projects, selectedProjectId, selectProject]);
 
-  // selectedProjectId 변경 시 hookSelectProject 자동 호출 연동 (파라미터 안전성 및 로딩 보장)
+  // selectedProjectId 변경 시 hookSelectProject 자동 호출 연동
   useEffect(() => {
     if (selectedProjectId) {
       const proj = projects.find(p => p.id === selectedProjectId);
@@ -259,24 +190,24 @@ export default function IntegratedPrototype() {
     }
   }, [activeWorkspaceTab, selectedProjectId, fetchScripts]);
 
-  // 반응형 Index 동기화 훅: Zustand ID 변경 시 custom hooks의 active index 상태를 뒤에서 자동 매핑
+  // 반응형 Index 동기화 훅: Zustand ID 변경 시 custom hooks의 active index 상태를 자동 매핑
   useEffect(() => {
     if (selectedInspirationId) {
       const idx = newsResults.findIndex(n => n.id === selectedInspirationId);
-      if (idx !== -1 && idx !== selectedNewsIndex) {
+      if (idx !== -1) {
         setSelectedNewsIndex(idx);
       }
     }
-  }, [selectedInspirationId, newsResults, selectedNewsIndex, setSelectedNewsIndex]);
+  }, [selectedInspirationId, newsResults, setSelectedNewsIndex]);
 
   useEffect(() => {
     if (selectedArchiveId) {
       const idx = archiveItems.findIndex(a => a.id === selectedArchiveId);
-      if (idx !== -1 && idx !== selectedArchiveIndex) {
+      if (idx !== -1) {
         setSelectedArchiveIndex(idx);
       }
     }
-  }, [selectedArchiveId, archiveItems, selectedArchiveIndex, setSelectedArchiveIndex]);
+  }, [selectedArchiveId, archiveItems, setSelectedArchiveIndex]);
 
   // Toast 알림 헬퍼
   const [toasts, setToasts] = useState<any[]>([]);
@@ -307,6 +238,7 @@ export default function IntegratedPrototype() {
       prevStatusesRef.current[item.id] = currentStatus;
     });
   }, [archiveItems, addToast]);
+
   // 사이드바 리사이즈 제어
   const [isResizingSidebar, setIsResizingSidebar] = useState<boolean>(false);
   
@@ -396,7 +328,7 @@ export default function IntegratedPrototype() {
     } else {
       setEditProjectTitle("");
       setEditProjectGenre("");
-      setFormatSelectMode("16부작 미니시리즈");
+      setFormatSelectMode("16부작 miniseries");
       setCustomFormat("");
       setEditProjectAtmosphere("");
       setEditProjectIntendedPurpose("");
@@ -549,6 +481,7 @@ export default function IntegratedPrototype() {
       setProjectLinkedInspirations(valOrFunc);
     }
   }, [projectLinkedInspirations, handleToggleLinkInspiration]);
+
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
       if (isResizingSidebar) {
@@ -567,14 +500,11 @@ export default function IntegratedPrototype() {
     };
   }, [isResizingSidebar, setSidebarWidth]);
 
-
-
   // 최근 검색어 (쿠키 기반 최근 5개 유지, 초기값 추천 태그 탑재)
   const [recentQueries, setRecentQueries] = useState<string[]>(["비자금", "납치", "딥페이크", "로비"]);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
-      // 쿠키 로드 헬퍼
       const getCookie = (name: string): string | null => {
         const nameEQ = name + "=";
         const ca = document.cookie.split(';');
@@ -604,7 +534,6 @@ export default function IntegratedPrototype() {
       const filteredPrev = prev.filter(q => q !== query);
       const next = [query, ...filteredPrev].slice(0, 5);
 
-      // 쿠키 저장 헬퍼
       const setCookie = (name: string, value: string, days = 30) => {
         const date = new Date();
         date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
@@ -626,22 +555,6 @@ export default function IntegratedPrototype() {
   const [editingNote, setEditingNote] = useState<any>(null);
   const [editTitle, setEditTitle] = useState<string>("");
   const [editContent, setEditContent] = useState<string>("");
-
-  // 1단계 자유 대본 작성기 에디터 텍스트 상태
-  const [scriptText, setScriptText] = useState<string>(
-    `# 1. 서부지검 검사장실 - 낮\n\n대리석으로 마감된 널찍한 검사장실. 무거운 침묵이 방 안을 채운다.\n검사장 자리에 앉은 강원철이 골치 아프다는 듯 미간을 짚고 있다.\n그 앞에 단정히 서 있는 황시목(30대 후반, 검사).\n\n강원철\n(한숨을 푹 쉬며)\n또 네 녀석이군. 이번엔 청와대 수석비서관을 건드려? 제정신인가?\n\n황시목\n(표정의 변화 없이 냉정히)\n법 앞에 성역이 없다고 배우지 않았습니까.\n\n강원철\n(벌떡 일어선다)\n성역? 그 성역이 네 목을 칠 수도 있어! 적당히 타협하는 법을 배워라!\n\n황시목\n그럼 검사복을 벗어야지요. 법이 아닌 세력을 쫓을 거라면.\n\n강원철\n(말문이 막혀 씩씩대다가 다시 주저앉는다)\n나가 봐. 오늘부로 너에 대한 감찰 부서 내사가 시작될 거다.\n\n# 2. 강력계 회의실 - 밤\n\n화이트보드에 빼곡히 적힌 용의자 관계도.\n스탠드 불빛 아래 한여진(30대 후반, 경감)이 컵라면을 불며 자료를 노려보고 있다.\n이때, 문이 조용히 열리며 황시목이 들어선다.\n\n한여진\n(라면을 먹다 멈칫하고 웃음 띤 얼굴로)\n어, 검사님? 이 야밤에 강력반까지 웬일이에요? 또 쫓겨나기 직전인가 보죠?\n\n황시목\n(주머니에 손을 넣은 채 걸어온다)\n의문사가 발견된 USB의 암호 해석이 끝났습니다. 강남 유흥업소 비자금 리스트입니다.`
-  );
-
-  // Outline 실시간 파싱 씬 리스트
-  const outline = useMemo(() => {
-    return scriptText.split("\n")
-      .filter(line => line.startsWith("#"))
-      .map((line, idx) => ({
-        id: `scene_${idx}`,
-        title: line.replace(/^#+\s*/, ""),
-        rawLine: line
-      }));
-  }, [scriptText]);
 
   // 캐릭터 CRUD 핸들러
   const handleOpenCharacterAdd = () => {
@@ -747,13 +660,10 @@ export default function IntegratedPrototype() {
     setModalOpen("plotEvent", false);
   };
 
-
-
-  // 7. 실시간 뉴스 & 아카이브 데이터 퀵 인사이트 맵 바인딩 (더미 배제 및 Gemini 분석 1:1 맵핑)
+  // 7. 실시간 뉴스 & 아카이브 데이터 퀵 인사이트 맵 바인딩
   const analyzedProjectsMap = useMemo(() => {
     const map: Record<string, any> = {};
 
-    // A. 실시간 검색 뉴스 매핑
     newsResults.forEach(item => {
       if (item.detail_analysis) {
         let da = item.detail_analysis;
@@ -787,7 +697,6 @@ export default function IntegratedPrototype() {
       }
     });
 
-    // B. 보관함 소스 매핑 (type: NEWS, FILE, NOTE 대응)
     archiveItems.forEach(item => {
       const meta = item.source_metadata || {};
       let da = meta.detailed_analysis || item.detailed_analysis;
@@ -825,7 +734,7 @@ export default function IntegratedPrototype() {
     return map;
   }, [newsResults, archiveItems]);
 
-  // 8. 현재 활성화된 기사 및 보관함 자산 퀵 매핑 (URL 바인딩 및 안전 참조 보완)
+  // 8. 현재 활성화된 기사 및 보관함 자산 퀵 매핑
   const currentInspiration = useMemo(() => {
     let item = null;
     if (inspirationSubTab === "search") {
@@ -843,7 +752,7 @@ export default function IntegratedPrototype() {
     return null;
   }, [selectedNews, selectedArchiveId, inspirationSubTab, archiveItems]);
 
-  // 9. AI 분석 요청 수동 트리거 및 백엔드 1:1 연동 (Index 동기화 완벽 보완)
+  // 9. AI 분석 요청 수동 트리거 및 백엔드 1:1 연동
   const handleTriggerQuickAnalysis = async (id: string, isFromArchive = false) => {
     if (isFromArchive) {
       await handleReanalyze(
@@ -866,31 +775,6 @@ export default function IntegratedPrototype() {
       );
     }
   };
-
-  // 보관함 필터 계산
-  const computedArchives = useMemo(() => {
-    let list = [...archiveItems];
-    
-    // 백엔드 SourceType NOTE, NEWS, FILE 완벽 분류 연동
-    if (archiveFilter !== "all") {
-      list = list.filter(item => {
-        if (archiveFilter === "text") return item.type === "NOTE";
-        if (archiveFilter === "url") return item.type === "NEWS";
-        if (archiveFilter === "file") return item.type === "FILE";
-        return true;
-      });
-    }
-
-    list.sort((a, b) => {
-      if (archiveSort === "name") {
-        return a.title.localeCompare(b.title, "ko");
-      } else {
-        return new Date(b.ingested_at || b.created_at).getTime() - new Date(a.ingested_at || a.created_at).getTime();
-      }
-    });
-
-    return list;
-  }, [archiveItems, archiveFilter, archiveSort]);
 
   // 프로젝트 참고 서랍 리스트
   const linkedReferenceItems = useMemo(() => {
@@ -915,13 +799,11 @@ export default function IntegratedPrototype() {
   if (!isMounted || !hasHydrated || !isAuthenticated) {
     return (
       <div className="relative w-screen h-screen overflow-hidden flex items-center justify-center bg-[#0D0D11]">
-        {/* 블러 처리된 메인화면 형태의 은은한 백그라운드 데코레이션 */}
         <div className="absolute inset-0 opacity-10 blur-[100px] pointer-events-none">
           <div className="absolute top-1/4 left-1/4 w-[400px] h-[400px] bg-amber-500 rounded-full" />
           <div className="absolute bottom-1/4 right-1/4 w-[400px] h-[400px] bg-indigo-600 rounded-full" />
         </div>
 
-        {/* 중앙 로딩 스크린 */}
         <div className="flex flex-col items-center gap-4 z-10 select-none animate-in fade-in duration-500">
           <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-amber-500 to-rose-600 flex items-center justify-center shadow-xl shadow-amber-500/10 border border-amber-500/20 animate-pulse">
             <PenTool size={28} className="text-white" />
@@ -945,344 +827,47 @@ export default function IntegratedPrototype() {
       isDarkMode ? "dark bg-[#0D0D11] text-[#E4E4ED]" : "bg-[#F8F9FC] text-[#1E202B]"
     )}>
       
-      {/* 1. Activity Bar (맨 왼쪽) - 최하단 margin을 조정하여 Next Indicator 겹침 방지 */}
-      <aside className={cn(
-        "w-[64px] flex flex-col items-center py-6 gap-8 border-r z-45 shrink-0",
-        isDarkMode ? "bg-[#09090C] border-zinc-800/80" : "bg-[#F0F2F7] border-zinc-200"
-      )}>
-        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500 to-rose-600 flex items-center justify-center shadow-lg shadow-amber-500/20 active:scale-95 transition-all">
-          <PenTool size={20} className="text-white" />
-        </div>
+      {/* 1. Activity Bar (맨 왼쪽) */}
+      <ActivityBar
+        activeActivity={activeActivity}
+        setActivity={setActivity}
+        isDarkMode={isDarkMode}
+        setDarkMode={setDarkMode}
+        user={user}
+        logout={logout}
+        router={router}
+      />
 
-        <nav className="flex flex-col gap-3 w-full px-2 flex-1">
-          {[
-            { id: "inspiration", icon: Sparkles, label: "영감 검색 & 보관" },
-            { id: "workspace", icon: Folder, label: "작업 공간" }
-          ].map(tab => {
-            const isActive = activeActivity === tab.id;
-            return (
-              <button
-                key={tab.id}
-                onClick={() => {
-                  setActivity(tab.id as any);
-                }}
-                title={tab.label}
-                className={cn(
-                  "relative group w-12 h-12 rounded-xl flex items-center justify-center transition-all duration-300",
-                  isActive 
-                    ? (isDarkMode ? "bg-amber-500 text-black shadow-lg shadow-amber-500/10 font-bold" : "bg-[#1E202B] text-white shadow-md font-bold")
-                    : (isDarkMode ? "text-zinc-500 hover:bg-zinc-800/50 hover:text-zinc-200" : "text-zinc-500 hover:bg-zinc-300/40 hover:text-zinc-900")
-                )}
-              >
-                <tab.icon size={22} className="transition-transform group-hover:scale-105" />
-                <div className={cn(
-                  "absolute left-16 px-3 py-1.5 rounded-lg text-xs font-bold pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-50 shadow-xl whitespace-nowrap",
-                  isDarkMode ? "bg-[#181822] text-zinc-100 border border-zinc-800" : "bg-white text-zinc-900 border border-zinc-200"
-                )}>
-                  {tab.label}
-                </div>
-              </button>
-            );
-          })}
-        </nav>
+      {/* 2. Explorer Sidebar (사이드바) */}
+      <SidebarPanel
+        activeActivity={activeActivity}
+        inspirationSubTab={inspirationSubTab}
+        setInspirationSubTab={setInspirationSubTab}
+        activeWorkspaceTab={activeWorkspaceTab}
+        setWorkspaceTab={setWorkspaceTab}
+        projects={projects}
+        selectedProjectId={selectedProjectId}
+        selectProject={selectProject}
+        setModalOpen={setModalOpen}
+        setIsProjectManageModalOpen={setIsProjectManageModalOpen}
+        searchQuery={searchQuery}
+        setSearchQuery={setSearchQuery}
+        handleSearch={handleSearch}
+        recentQueries={recentQueries}
+        addToRecentQueries={addToRecentQueries}
+        archiveFilter={archiveFilter}
+        setArchiveFilter={setArchiveFilter}
+        archiveSort={archiveSort}
+        setArchiveSort={setArchiveSort}
+        isResizingSidebar={isResizingSidebar}
+        setIsResizingSidebar={setIsResizingSidebar}
+        sidebarWidth={sidebarWidth}
+        isDarkMode={isDarkMode}
+        addToast={addToast}
+        fetchProjects={fetchProjects}
+      />
 
-        <div className="flex flex-col items-center gap-4 w-full mb-24">
-          <button 
-            onClick={() => setDarkMode(!isDarkMode)}
-            className={cn(
-              "w-10 h-10 rounded-lg flex items-center justify-center transition-all",
-              isDarkMode ? "text-amber-400 hover:bg-zinc-900" : "text-zinc-600 hover:bg-zinc-200"
-            )}
-          >
-            {isDarkMode ? <Sun size={18} /> : <Moon size={18} />}
-          </button>
-          
-          <button 
-            onClick={() => {
-              logout();
-              router.push("/login");
-            }}
-            title="로그아웃"
-            className={cn(
-              "w-10 h-10 rounded-lg flex items-center justify-center transition-all hover:bg-rose-500/10 text-zinc-500 hover:text-rose-500",
-              isDarkMode ? "hover:bg-rose-500/10" : "hover:bg-rose-500/10"
-            )}
-          >
-            <LogOut size={18} />
-          </button>
-
-          <div 
-            title={user?.full_name || user?.email || "작가님"}
-            className="w-9 h-9 rounded-full bg-zinc-700/60 border border-zinc-500/30 overflow-hidden flex items-center justify-center shadow-md active:scale-95 transition-all"
-          >
-            <span className="text-xs font-bold text-amber-500">
-              {user?.full_name ? user.full_name.substring(0, 2) : (user?.email ? user.email.substring(0, 2) : "작가")}
-            </span>
-          </div>
-        </div>
-      </aside>
-
-      {/* 2. Explorer Sidebar (사이드바) - 작가님이 극찬하셨던 프리뷰 디자인 100% 완벽 복원 */}
-      <aside 
-        style={{ width: `${sidebarWidth}px` }}
-        className={cn(
-          "relative flex flex-col h-full border-r shrink-0 select-none transition-all duration-75 z-40",
-          isDarkMode ? "bg-[#111115] border-zinc-800/80" : "bg-[#F5F6FA] border-zinc-200"
-        )}
-      >
-        <div 
-          onMouseDown={() => setIsResizingSidebar(true)}
-          className={cn(
-            "absolute right-0 top-0 w-1 h-full cursor-col-resize hover:bg-amber-500/50 transition-colors z-50",
-            isResizingSidebar ? "bg-amber-500 w-1.5" : ""
-          )} 
-        />
-        
-        {/* A. 영감 검색 & 보관 2단 탭 스위치 프리뷰 디자인 복원 */}
-        {activeActivity === "inspiration" && (
-          <div className="flex flex-col h-full animate-in fade-in slide-in-from-left-4 duration-300">
-            <div className="p-5 border-b border-zinc-800/20 flex flex-col gap-4">
-              <div className="flex items-center justify-between">
-                <h3 className="text-sm font-black tracking-wider uppercase text-amber-500">영감 기획실</h3>
-              </div>
-              
-              <div className={cn(
-                "p-1 rounded-xl flex gap-1",
-                isDarkMode ? "bg-zinc-900/80" : "bg-zinc-200/50"
-              )}>
-                <button
-                  onClick={() => {
-                    setInspirationSubTab("search");
-                  }}
-                  className={cn(
-                    "flex-1 text-center py-2 text-[11px] font-bold rounded-lg transition-all",
-                    inspirationSubTab === "search"
-                      ? (isDarkMode ? "bg-zinc-800 text-amber-400 shadow-md" : "bg-white text-zinc-900 shadow-sm")
-                      : "text-zinc-500 hover:text-zinc-300"
-                  )}
-                >
-                  영감 검색
-                </button>
-                <button
-                  onClick={() => {
-                    setInspirationSubTab("archive");
-                  }}
-                  className={cn(
-                    "flex-1 text-center py-2 text-[11px] font-bold rounded-lg transition-all",
-                    inspirationSubTab === "archive"
-                      ? (isDarkMode ? "bg-zinc-800 text-amber-400 shadow-md" : "bg-white text-zinc-900 shadow-sm")
-                      : "text-zinc-500 hover:text-zinc-300"
-                  )}
-                >
-                  영감 보관함
-                </button>
-              </div>
-            </div>
-
-            <div className="p-4 flex flex-col gap-5 flex-1">
-              {inspirationSubTab === "search" ? (
-                <>
-                  <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest px-1">검색 설정</span>
-                  <div className="flex flex-col gap-3">
-                    <form onSubmit={(e) => { 
-                      e.preventDefault(); 
-                      if (searchQuery.trim()) {
-                        handleSearch(searchQuery, 1); 
-                        addToRecentQueries(searchQuery);
-                      }
-                    }} className={cn(
-                      "flex items-center gap-2.5 px-3 py-2.5 rounded-xl border transition-all",
-                      isDarkMode ? "bg-zinc-900/50 border-zinc-800 focus-within:border-amber-500/50" : "bg-white border-zinc-200 focus-within:border-amber-500"
-                    )}>
-                      <Search size={14} className="text-zinc-500" />
-                      <input 
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        placeholder="사건 키워드 입력..." 
-                        className="bg-transparent border-none outline-none text-xs w-full font-medium text-white"
-                      />
-                    </form>
-                    <div className="flex flex-col gap-1.5">
-                      <span className="text-[9px] text-zinc-500 font-bold">최근 검색어</span>
-                      <div className="flex flex-wrap gap-1.5">
-                        {recentQueries.length > 0 ? (
-                          recentQueries.map(tag => (
-                            <span 
-                              key={tag} 
-                              onClick={() => { 
-                                setSearchQuery(tag); 
-                                handleSearch(tag, 1); 
-                                addToRecentQueries(tag);
-                              }}
-                              className="text-[9px] bg-zinc-800 text-zinc-400 hover:text-amber-400 hover:bg-zinc-700/50 px-2.5 py-1 rounded-md cursor-pointer transition-all"
-                            >
-                              {tag}
-                            </span>
-                          ))
-                        ) : (
-                          <span className="text-[9px] text-zinc-650 font-bold italic px-1">최근 검색어가 없습니다.</span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </>
-              ) : (
-                <>
-                  {/* 필터 조건 및 정렬 조건을 명확히 이원화하여 분리 설계 */}
-                  <div className="flex flex-col gap-4">
-                    <div className="flex flex-col gap-2">
-                      <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest px-1 flex items-center gap-1">
-                        <Filter size={10} />
-                        필터 조건
-                      </span>
-                      <select 
-                        value={archiveFilter}
-                        onChange={(e) => {
-                          setArchiveFilter(e.target.value);
-                        }}
-                        className={cn(
-                          "w-full px-3 py-2 text-xs font-bold outline-none border rounded-xl appearance-none cursor-pointer",
-                          isDarkMode ? "bg-zinc-900 border-zinc-800 text-zinc-300" : "bg-white border-zinc-200 text-zinc-800"
-                        )}
-                      >
-                        <option value="all">전체 자산 보기</option>
-                        <option value="text">✍️ 직접 작성 극작 메모</option>
-                        <option value="url">🔗 외부 링크 기사</option>
-                        <option value="file">📁 첨부 파일 문서</option>
-                      </select>
-                    </div>
-
-                    <div className="flex flex-col gap-2">
-                      <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest px-1 flex items-center gap-1">
-                        <SortAsc size={10} />
-                        정렬 방식
-                      </span>
-                      <select 
-                        value={archiveSort}
-                        onChange={(e) => {
-                          setArchiveSort(e.target.value);
-                        }}
-                        className={cn(
-                          "w-full px-3 py-2 text-xs font-bold outline-none border rounded-xl appearance-none cursor-pointer",
-                          isDarkMode ? "bg-zinc-900 border-zinc-800 text-zinc-300" : "bg-white border-zinc-200 text-zinc-800"
-                        )}
-                      >
-                        <option value="date">⏳ 수집 날짜순</option>
-                        <option value="name">🔤 제목 이름순</option>
-                      </select>
-                    </div>
-
-                    {/* 신규 영감 수집 클릭 시 모달창 실행 버튼 */}
-                    <button 
-                      onClick={() => setModalOpen("collect", true)}
-                      className="w-full py-3 bg-amber-500 text-black hover:bg-amber-400 text-xs font-black rounded-xl transition-all text-center flex items-center justify-center gap-1.5 shadow-md active:scale-95 mt-4"
-                    >
-                      <Plus size={14} />
-                      <span>신규 영감 수집</span>
-                    </button>
-                  </div>
-                </>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* B. 작업 공간 (Workspace) 사이드바 프리뷰 디자인 복원 */}
-        {activeActivity === "workspace" && (
-          <div className="flex flex-col h-full animate-in fade-in slide-in-from-left-4 duration-300">
-            {/* 프로젝트 선택기 및 신설 헤더 */}
-            <div className="p-5 border-b border-zinc-800/20 flex flex-col gap-3 shrink-0">
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] font-black tracking-wider uppercase text-zinc-500">ACTIVE WORKSPACE</span>
-                <div className="flex items-center gap-1">
-                  <button 
-                    onClick={() => setIsProjectManageModalOpen(true)}
-                    className="p-1.5 hover:bg-zinc-800 rounded text-zinc-400 hover:text-white transition-all"
-                    title="드라마 프로젝트 관리 (삭제/순서조정)"
-                  >
-                    <Settings size={14} />
-                  </button>
-                  <button
-                    onClick={handleImportClick}
-                    disabled={isImporting}
-                    className="p-1.5 hover:bg-zinc-800 rounded text-amber-500 hover:text-amber-400 transition-all disabled:opacity-50"
-                    title="백업 파일로 복원하기 (.json)"
-                  >
-                    <Upload size={14} className={cn(isImporting && "animate-pulse")} />
-                  </button>
-                  <button 
-                    onClick={() => setModalOpen("project", true)}
-                    className="p-1.5 hover:bg-zinc-800 rounded text-amber-500 hover:text-amber-400 transition-all"
-                    title="신규 드라마 프로젝트 기획"
-                  >
-                    <Plus size={16} />
-                  </button>
-                </div>
-              </div>
-              <div className="relative">
-                <select 
-                  value={selectedProjectId || ""}
-                  onChange={(e) => {
-                    const nextId = e.target.value;
-                    selectProject(nextId);
-                  }}
-                  className={cn(
-                    "w-full px-3 py-2.5 rounded-xl border text-xs font-extrabold outline-none appearance-none cursor-pointer pr-8 transition-all",
-                    isDarkMode ? "bg-zinc-900 border-zinc-800 text-white hover:bg-zinc-800/50" : "bg-white border-zinc-200 text-zinc-900"
-                  )}
-                >
-                  {projects.map(proj => (
-                    <option key={proj.id} value={proj.id}>{proj.title}</option>
-                  ))}
-                </select>
-                <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-zinc-500">
-                  <ChevronDown size={14} />
-                </div>
-              </div>
-            </div>
-
-            {/* 프로젝트 세부 집필/기획 하위 메뉴 트리 */}
-            <div className="flex-1 overflow-y-auto custom-scrollbar-dark p-4 flex flex-col gap-4">
-              <div className="flex flex-col gap-1">
-                <span className="text-[10px] font-black text-zinc-500 uppercase tracking-widest px-2 mb-2 block">드라마 기획 & 집필 도구</span>
-                
-                {[
-                  { id: "info", label: "프로젝트 정보", icon: Info, color: "text-blue-400" },
-                  { id: "world", label: "세계관 설정", icon: Globe, color: "text-cyan-400" },
-                  { id: "characters", label: "캐릭터 맵", icon: Users, color: "text-emerald-400" },
-                  { id: "plot", label: "플롯 이벤트", icon: GitCommit, color: "text-purple-400" },
-                  { id: "draft", label: "초안 & 시놉시스", icon: FileText, color: "text-pink-400" },                  
-                  { id: "editor", label: "대본 작성기", icon: PenTool, color: "text-amber-400" }                  
-                ].map(menu => {
-                  const isSelected = activeWorkspaceTab === menu.id;
-                  return (
-                    <button
-                      key={menu.id}
-                      onClick={() => {
-                        setWorkspaceTab(menu.id as any);
-                      }}
-                      className={cn(
-                        "w-full flex items-center justify-between px-3 py-3.5 rounded-xl text-left transition-all active:scale-95 group",
-                        isSelected
-                          ? (isDarkMode ? "bg-[#252535] text-white border border-[#3b3b55] font-bold shadow-xl shadow-black/10" : "bg-[#EAEFFD] text-[#3b59f6] border border-[#d2dcfb] font-bold")
-                          : (isDarkMode ? "text-zinc-400 hover:bg-zinc-900 hover:text-white" : "text-zinc-600 hover:bg-zinc-200/50 hover:text-zinc-900")
-                      )}
-                    >
-                      <div className="flex items-center gap-3">
-                        <menu.icon size={16} className={cn(menu.color, isSelected ? "scale-110" : "group-hover:scale-105 transition-transform")} />
-                        <span className="text-xs font-semibold">{menu.label}</span>
-                      </div>
-                      <ChevronRight size={12} className={cn("text-zinc-600 group-hover:translate-x-0.5 transition-transform", isSelected ? "text-white" : "")} />
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-        )}
-      </aside>
-
-      {/* 3. Main Workspace (메인 캔버스 영역) - 100% 프리뷰 디자인 복원 및 실데이터 접합 */}
+      {/* 3. Main Workspace (메인 캔버스 영역) */}
       <main className="flex-1 flex flex-col min-w-0 overflow-hidden relative z-10">
         
         {/* 상단 통합 헤더 */}
@@ -1293,18 +878,16 @@ export default function IntegratedPrototype() {
           <div className="flex items-center gap-2.5 text-xs font-medium">
             {activeActivity === "inspiration" ? (
               <>
-                <Sparkles size={14} className="text-amber-500" />
                 <span className="font-bold">영감 기획실</span>
-                <ChevronRight size={12} className="text-zinc-600" />
+                <span className="text-zinc-600">/</span>
                 <span className={cn("font-extrabold uppercase tracking-wide", isDarkMode ? "text-zinc-300" : "text-zinc-800")}>
                   {inspirationSubTab === "search" ? "영감 검색 (스카우터)" : "영감 보관함"}
                 </span>
               </>
             ) : (
               <>
-                <Folder size={14} className="text-amber-500" />
                 <span className="font-bold">{currentProject?.title || "드라마 프로젝트"}</span>
-                <ChevronRight size={12} className="text-zinc-600" />
+                <span className="text-zinc-600">/</span>
                 <span className={cn("font-extrabold uppercase tracking-wide", isDarkMode ? "text-zinc-300" : "text-zinc-800")}>
                   {activeWorkspaceTab === "info" && "프로젝트 정보"}
                   {activeWorkspaceTab === "characters" && "캐릭터 관계도"}
@@ -1319,12 +902,10 @@ export default function IntegratedPrototype() {
 
           <div className="flex items-center gap-4">
             <button 
-              onClick={() => {
-                setRightPanelOpen(!isRightPanelOpen);
-              }}
+              onClick={() => toggleRightPanel()}
               className={cn(
                 "p-2 rounded-lg border transition-all",
-                isDarkMode ? "bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-white" : "bg-white border-zinc-200 text-zinc-600 hover:text-zinc-950"
+                isDarkMode ? "bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-white" : "bg-white border-zinc-200 text-zinc-600 hover:text-zinc-955"
               )}
               title="우측 참고 분할 뷰 토글"
             >
@@ -1353,11 +934,8 @@ export default function IntegratedPrototype() {
                       source: item.article?.link?.includes("google.com") ? "구글 뉴스" : "네이버 뉴스",
                       date: item.article?.pubDate || ""
                     }))} 
-                    // 기사 클릭 시 custom hooks의 index 및 ID 상태 동기화 처리 (AI 분석 작동 완벽 대응)
                     selectInspiration={(id) => {
                       selectInspiration(id);
-                      const idx = newsResults.findIndex(n => n.id === id);
-                      if (idx !== -1) setSelectedNewsIndex(idx);
                     }}
                     searchQuery={searchQuery}
                     handleLoadMore={() => handleSearch(searchQuery, currentStart + 10)}
@@ -1378,8 +956,6 @@ export default function IntegratedPrototype() {
                     addToast={addToast}
                     selectArchive={(id) => {
                       selectArchive(id);
-                      const idx = archiveItems.findIndex(a => a.id === id);
-                      if (idx !== -1) setSelectedArchiveIndex(idx);
                     }}
                     onEditClick={(item) => {
                       const originalItem = archiveItems.find(a => a.id === item.id);
@@ -1406,134 +982,82 @@ export default function IntegratedPrototype() {
           )}
 
           {activeActivity === "workspace" && (
-            <div className="flex-1 flex overflow-hidden animate-in fade-in duration-300">
-              {!selectedProjectId ? (
-                <div className="flex-1 flex flex-col items-center justify-center p-8 bg-[#0D0D12] text-center border-l border-zinc-900/60">
-                  <div className="relative mb-6 p-6 rounded-3xl bg-zinc-950 border border-zinc-800/80 shadow-2xl flex items-center justify-center">
-                    <div className="absolute inset-0 bg-purple-500/5 rounded-3xl blur-xl" />
-                    <FolderPlus className="w-16 h-16 text-purple-400 relative z-10 animate-pulse" />
-                  </div>
-                  <h2 className="text-xl font-black text-white mb-2">진행 중인 극작 프로젝트가 없습니다</h2>
-                  <p className="text-sm text-zinc-500 max-w-md mb-8 leading-relaxed">
-                    새로운 이야기의 첫발을 떼어보세요. 프로젝트를 생성하시면 시놉시스 기획, 인물 관계도 매핑, 대본 집필 등의 다양한 창작 도구들을 즉시 사용할 수 있습니다.
-                  </p>
-                  <button
-                    onClick={() => setModalOpen("project", true)}
-                    className="flex items-center gap-2 px-6 py-3.5 rounded-2xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold text-sm shadow-lg shadow-purple-900/20 hover:scale-[1.02] active:scale-[0.98] transition-all"
-                  >
-                    <Plus size={16} />
-                    새 극작 프로젝트 시작하기
-                  </button>
-                </div>
-              ) : (
-                <>
-                  {activeWorkspaceTab === "info" && (
-                    <ProjectInfo
-                      currentProject={currentProject}
-                      editProjectTitle={editProjectTitle}
-                      setEditProjectTitle={setEditProjectTitle}
-                      editProjectGenre={editProjectGenre}
-                      setEditProjectGenre={setEditProjectGenre}
-                      formatSelectMode={formatSelectMode}
-                      setFormatSelectMode={setFormatSelectMode}
-                      customFormat={customFormat}
-                      setCustomFormat={setCustomFormat}
-                      editProjectAtmosphere={editProjectAtmosphere}
-                      setEditProjectAtmosphere={setEditProjectAtmosphere}
-                      editProjectIntendedPurpose={editProjectIntendedPurpose}
-                      setEditProjectIntendedPurpose={setEditProjectIntendedPurpose}
-                      editProjectCoreConflict={editProjectCoreConflict}
-                      setEditProjectCoreConflict={setEditProjectCoreConflict}
-                      editProjectTheme={editProjectTheme}
-                      setEditProjectTheme={setEditProjectTheme}
-                      editProjectLogline={editProjectLogline}
-                      setEditProjectLogline={setEditProjectLogline}
-                      handleSaveProjectInfo={handleSaveProjectInfo}
-                      addToast={addToast}
-                    />
-                  )}
+            <WorkspaceContainer
+              selectedProjectId={selectedProjectId}
+              currentProject={currentProject}
+              activeWorkspaceTab={activeWorkspaceTab}
+              isDarkMode={isDarkMode}
+              setModalOpen={setModalOpen}
+              addToast={addToast}
+              
+              // ProjectInfo
+              editProjectTitle={editProjectTitle}
+              setEditProjectTitle={setEditProjectTitle}
+              editProjectGenre={editProjectGenre}
+              setEditProjectGenre={setEditProjectGenre}
+              formatSelectMode={formatSelectMode}
+              setFormatSelectMode={setFormatSelectMode}
+              customFormat={customFormat}
+              setCustomFormat={setCustomFormat}
+              editProjectAtmosphere={editProjectAtmosphere}
+              setEditProjectAtmosphere={setEditProjectAtmosphere}
+              editProjectIntendedPurpose={editProjectIntendedPurpose}
+              setEditProjectIntendedPurpose={setEditProjectIntendedPurpose}
+              editProjectCoreConflict={editProjectCoreConflict}
+              setEditProjectCoreConflict={setEditProjectCoreConflict}
+              editProjectTheme={editProjectTheme}
+              setEditProjectTheme={setEditProjectTheme}
+              editProjectLogline={editProjectLogline}
+              setEditProjectLogline={setEditProjectLogline}
+              handleSaveProjectInfo={handleSaveProjectInfo}
 
-                  {activeWorkspaceTab === "characters" && (
-                    <CharacterMapDualView 
-                      characters={characters} 
-                      handleOpenCharacterAdd={handleOpenCharacterAdd} 
-                      handleOpenCharacterEdit={handleOpenCharacterEdit} 
-                      syncCharacters={syncCharacters}
-                      deleteCharacter={deleteCharacter}
-                      handleGenerateMapDraft={handleGenerateMapDraft}
-                      project={currentProject}
-                      isDarkMode={isDarkMode}
-                      nodes={nodes}
-                      setNodes={setNodes}
-                      onNodesChange={onNodesChange}
-                      edges={edges}
-                      setEdges={setEdges}
-                      onEdgesChange={onEdgesChange}
-                      handleSaveLabSession={handleSaveLabSession}
-                      addToast={addToast}
-                    />
-                  )}
+              // Characters
+              characters={characters}
+              handleOpenCharacterAdd={handleOpenCharacterAdd}
+              handleOpenCharacterEdit={handleOpenCharacterEdit}
+              syncCharacters={syncCharacters}
+              deleteCharacter={deleteCharacter}
+              handleGenerateMapDraft={handleGenerateMapDraft}
+              nodes={nodes}
+              setNodes={setNodes}
+              onNodesChange={onNodesChange}
+              edges={edges}
+              setEdges={setEdges}
+              onEdgesChange={onEdgesChange}
+              handleSaveLabSession={handleSaveLabSession}
 
-                  {activeWorkspaceTab === "plot" && (
-                    <PlotTimeline 
-                      events={events}
-                      projectId={selectedProjectId || undefined}
-                      characters={characters}
-                      isGenerating={isGeneratingPlot}
-                      handleOpenEventAdd={handleOpenEventAdd}
-                      handleOpenEventEdit={handleOpenEventEdit}
-                      onDeleteEvent={deleteEvent}
-                      onReorder={reorderEvents}
-                      onGenerateDraft={generatePlotDraft}
-                      addToast={addToast}
-                    />
-                  )}
+              // Plot Timeline
+              events={events}
+              isGeneratingPlot={isGeneratingPlot}
+              handleOpenEventAdd={handleOpenEventAdd}
+              handleOpenEventEdit={handleOpenEventEdit}
+              deleteEvent={deleteEvent}
+              reorderEvents={reorderEvents}
+              generatePlotDraft={generatePlotDraft}
 
-                  {activeWorkspaceTab === "draft" && (
-                    <SynopsisWorkspaceView
-                      currentProject={currentProject}
-                      characters={characters}
-                      editProjectLogline={editProjectLogline}
-                      setEditProjectLogline={setEditProjectLogline}
-                      editProjectFullSynopsis={editProjectFullSynopsis}
-                      setEditProjectFullSynopsis={setEditProjectFullSynopsis}
-                      isGeneratingSynopsis={isGeneratingSynopsis}
-                      handleGenerateLogline={handleGenerateLogline}
-                      handleGenerateSynopsis={handleGenerateSynopsis}
-                      handleSaveSynopsis={handleSaveSynopsis}
-                      handleExportDocument={handleExportDocument}
-                    />
-                  )}
+              // Synopsis
+              editProjectFullSynopsis={editProjectFullSynopsis}
+              setEditProjectFullSynopsis={setEditProjectFullSynopsis}
+              isGeneratingSynopsis={isGeneratingSynopsis}
+              handleGenerateLogline={handleGenerateLogline}
+              handleGenerateSynopsis={handleGenerateSynopsis}
+              handleSaveSynopsis={handleSaveSynopsis}
+              handleExportDocument={handleExportDocument}
 
-                  {activeWorkspaceTab === "editor" && (
-                    <ScriptEditor 
-                      projectId={selectedProjectId}
-                      scripts={scripts}
-                      currentScript={currentScript}
-                      setCurrentScript={setCurrentScript}
-                      createScript={createScript}
-                      updateScript={updateScript}
-                      deleteScript={deleteScript}
-                      isLoading={isLoadingScripts}
-                      addToast={addToast} 
-                    />
-                  )}
-
-                  {activeWorkspaceTab === "world" && selectedProjectId && (
-                    <WorldBuildingView 
-                      projectId={selectedProjectId}
-                      isDarkMode={isDarkMode}
-                      addToast={addToast}
-                    />
-                  )}
-                </>
-              )}
-            </div>
+              // Scripts Editor
+              scripts={scripts}
+              currentScript={currentScript}
+              setCurrentScript={setCurrentScript}
+              createScript={createScript}
+              updateScript={updateScript}
+              deleteScript={deleteScript}
+              isLoadingScripts={isLoadingScripts}
+            />
           )}
         </div>
       </main>
 
-      {/* 4. 우측 보조 패널 (피드백 반영: 영감 기획실 vs 작업 공간 활성 탭에 따른 컨텍스트 이원화 탑재 및 AI 분석 실데이터 100% 바인딩) */}
+      {/* 4. 우측 보조 패널 */}
       <RightInsightPanel 
         currentInspiration={currentInspiration}
         isAnalyzingQuick={isAnalyzingDetail || isUploading}
@@ -1551,7 +1075,7 @@ export default function IntegratedPrototype() {
 
       {/* --- 글로벌 팝업 & 모달 기획창 --- */}
       
-      {/* 1-2. 극작 메모 수정 모달 (신설) */}
+      {/* 1-2. 극작 메모 수정 모달 */}
       {isEditModalOpen && editingNote && (
         <div className="fixed inset-0 bg-black/85 flex items-center justify-center z-[1000] p-4 animate-in fade-in duration-300">
           <div className="bg-[#14141A] border border-zinc-800 rounded-3xl w-full max-w-xl overflow-hidden flex flex-col shadow-2xl">
@@ -1567,7 +1091,7 @@ export default function IntegratedPrototype() {
                 }} 
                 className="p-2 hover:bg-zinc-800 rounded-xl text-zinc-500 hover:text-white transition-all"
               >
-                <X size={16} />
+                <span className="text-xs">✕</span>
               </button>
             </div>
 
@@ -1584,7 +1108,7 @@ export default function IntegratedPrototype() {
               </div>
 
               <div className="flex flex-col gap-2">
-                <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider">메모 상세 기술 (줄바꿈 포함 가능)</span>
+                <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider">메모 상세 기술</span>
                 <textarea 
                   value={editContent}
                   onChange={(e) => setEditContent(e.target.value)}
@@ -1704,7 +1228,7 @@ export default function IntegratedPrototype() {
         addToast={addToast}
       />
 
-      {/* 6. 영감-프로젝트 다중 연결 설정 모달 (신설) */}
+      {/* 6. 영감-프로젝트 다중 연결 설정 모달 */}
       <LinkInspirationProjectModal 
         isOpen={isLinkInspirationProjectModalOpen}
         onClose={() => {
@@ -1717,7 +1241,7 @@ export default function IntegratedPrototype() {
         addToast={addToast}
       />
 
-      {/* 5. 프로젝트 관리 및 순서제어 모달 (신설) */}
+      {/* 5. 프로젝트 관리 및 순서제어 모달 */}
       {isProjectManageModalOpen && (
         <div className="fixed inset-0 bg-black/85 flex items-center justify-center z-[1000] p-4 animate-in fade-in duration-300">
           <div className="bg-[#14141A] border border-zinc-800 rounded-3xl w-full max-w-xl overflow-hidden flex flex-col shadow-2xl">
@@ -1730,7 +1254,7 @@ export default function IntegratedPrototype() {
                 onClick={() => setIsProjectManageModalOpen(false)} 
                 className="p-2 hover:bg-zinc-800 rounded-xl text-zinc-500 hover:text-white transition-all"
               >
-                <X size={16} />
+                <span className="text-xs">✕</span>
               </button>
             </div>
 
@@ -1747,7 +1271,7 @@ export default function IntegratedPrototype() {
                     )}
                   >
                     <div className="flex items-center gap-3.5">
-                      {/* 순서 조정 버튼 (화살표) */}
+                      {/* 순서 조정 버튼 */}
                       <div className="flex flex-col gap-1">
                         <button 
                           disabled={idx === 0}
@@ -1757,11 +1281,10 @@ export default function IntegratedPrototype() {
                             next[idx] = next[idx - 1];
                             next[idx - 1] = temp;
                             setProjects(next);
-                            
                           }}
-                          className="p-0.5 hover:bg-zinc-800 rounded text-zinc-500 hover:text-zinc-200 disabled:opacity-30 disabled:hover:bg-transparent"
+                          className="p-0.5 hover:bg-zinc-800 rounded text-zinc-500 hover:text-zinc-200 disabled:opacity-30"
                         >
-                          <ChevronDown size={14} className="rotate-180" />
+                          <span className="text-[10px] rotate-180 block">▼</span>
                         </button>
                         <button 
                           disabled={idx === projects.length - 1}
@@ -1772,9 +1295,9 @@ export default function IntegratedPrototype() {
                             next[idx + 1] = temp;
                             setProjects(next);
                           }}
-                          className="p-0.5 hover:bg-zinc-800 rounded text-zinc-500 hover:text-zinc-200 disabled:opacity-30 disabled:hover:bg-transparent"
+                          className="p-0.5 hover:bg-zinc-800 rounded text-zinc-500 hover:text-zinc-200 disabled:opacity-30"
                         >
-                          <ChevronDown size={14} />
+                          <span className="text-[10px] block">▼</span>
                         </button>
                       </div>
                       
@@ -1806,7 +1329,7 @@ export default function IntegratedPrototype() {
                       className="p-2 hover:bg-rose-500/10 rounded-xl text-zinc-500 hover:text-rose-500 transition-all"
                       title="프로젝트 삭제"
                     >
-                      <Trash2 size={14} />
+                      <span className="text-xs">🗑️</span>
                     </button>
                   </div>
                 ))
@@ -1831,14 +1354,6 @@ export default function IntegratedPrototype() {
       <ToastContainer 
         toasts={toasts}
         setToasts={setToasts}
-      />
-
-      <input 
-        type="file" 
-        ref={fileInputRef} 
-        onChange={handleFileChange} 
-        style={{ display: "none" }} 
-        accept=".json" 
       />
     </div>
   );

@@ -3,41 +3,69 @@
 import React, { useState, useRef } from "react";
 import { 
   Search, Filter, SortAsc, Plus, Settings, ChevronDown, ChevronRight, 
-  Info, Users, GitCommit, FileText, PenTool, Upload 
+  Info, Users, GitCommit, FileText, PenTool, Upload, Globe
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import api from "@/lib/api";
 
 interface SidebarPanelProps {
+  /** 현재 활성화된 최상위 액티비티 */
   activeActivity: "inspiration" | "workspace";
+  /** 영감 탭 내부 서브 탭 */
   inspirationSubTab: "search" | "archive";
+  /** 영감 서브 탭 변경 핸들러 */
   setInspirationSubTab: (tab: "search" | "archive") => void;
+  /** 워크스페이스 내부 활성 탭 */
   activeWorkspaceTab: string;
+  /** 워크스페이스 활성 탭 변경 핸들러 */
   setWorkspaceTab: (tab: any) => void;
+  /** 전체 드라마 프로젝트 목록 */
   projects: any[];
-  currentProject: any;
+  /** 현재 선택된 프로젝트 ID */
   selectedProjectId: string | null;
+  /** 프로젝트 선택 변경 핸들러 */
   selectProject: (id: string | null) => void;
+  /** 글로벌 모달 제어 핸들러 */
   setModalOpen: (modalName: any, isOpen: boolean) => void;
+  /** 프로젝트 관리 모달 오픈 제어 핸들러 */
   setIsProjectManageModalOpen: (isOpen: boolean) => void;
+  /** 실시간 뉴스 검색 쿼리 */
   searchQuery: string;
+  /** 검색 쿼리 상태 업데이트 핸들러 */
   setSearchQuery: (q: string) => void;
+  /** 뉴스 검색 실행 핸들러 */
   handleSearch: (query: string, start: number) => Promise<void>;
+  /** 최근 검색어 목록 */
   recentQueries: string[];
+  /** 최근 검색어 추가 핸들러 */
   addToRecentQueries: (q: string) => void;
+  /** 보관함 필터 조건 */
   archiveFilter: string;
+  /** 보관함 필터 조건 업데이트 핸들러 */
   setArchiveFilter: (filter: string) => void;
+  /** 보관함 정렬 조건 */
   archiveSort: string;
+  /** 보관함 정렬 조건 업데이트 핸들러 */
   setArchiveSort: (sort: string) => void;
-  outline: Array<{ id: string; title: string; rawLine: string }>;
+  /** 마우스 드래그를 통한 크기 조절 상태 */
   isResizingSidebar: boolean;
+  /** 크기 조절 상태 핸들러 */
   setIsResizingSidebar: (val: boolean) => void;
+  /** 사이드바 넓이 */
   sidebarWidth: number;
+  /** 다크 모드 여부 */
   isDarkMode: boolean;
+  /** 토스트 메시지 출력 핸들러 */
   addToast: (message: string, type?: "success" | "info" | "warning" | "error") => void;
+  /** 프로젝트 목록 갱신 API 핸들러 */
   fetchProjects: () => Promise<void>;
 }
 
+/**
+ * SidebarPanel 컴포넌트
+ * 영감 탐색/검색 또는 워크스페이스의 드라마 기획 메뉴 트리를 렌더링하는 2단 사이드바 패널입니다.
+ * 사이드바 리사이징 마우스 트리거 및 드래그 바를 포함합니다.
+ */
 export default function SidebarPanel({
   activeActivity,
   inspirationSubTab,
@@ -58,13 +86,12 @@ export default function SidebarPanel({
   setArchiveFilter,
   archiveSort,
   setArchiveSort,
-  outline,
   isResizingSidebar,
   setIsResizingSidebar,
   sidebarWidth,
   isDarkMode,
   addToast,
-  fetchProjects
+  fetchProjects,
 }: SidebarPanelProps) {
   const [isImporting, setIsImporting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -73,11 +100,13 @@ export default function SidebarPanel({
     fileInputRef.current?.click();
   };
 
+  /**
+   * 프로젝트 백업 JSON 파일(.json) 업로드 및 복원을 진행합니다.
+   */
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // input 값 초기화
     e.target.value = "";
 
     const reader = new FileReader();
@@ -116,10 +145,11 @@ export default function SidebarPanel({
     <aside 
       style={{ width: `${sidebarWidth}px` }}
       className={cn(
-        "relative flex flex-col h-full border-r shrink-0 select-none transition-all duration-75 z-40",
+        "relative flex flex-col h-full border-r shrink-0 select-none transition-all duration-75 z-45",
         isDarkMode ? "bg-[#111115] border-zinc-800/80" : "bg-[#F5F6FA] border-zinc-200"
       )}
     >
+      {/* 리사이즈용 마우스 드래그 핸들 */}
       <div 
         onMouseDown={() => setIsResizingSidebar(true)}
         className={cn(
@@ -141,9 +171,7 @@ export default function SidebarPanel({
               isDarkMode ? "bg-zinc-900/80" : "bg-zinc-200/50"
             )}>
               <button
-                onClick={() => {
-                  setInspirationSubTab("search");
-                }}
+                onClick={() => setInspirationSubTab("search")}
                 className={cn(
                   "flex-1 text-center py-2 text-[11px] font-bold rounded-lg transition-all",
                   inspirationSubTab === "search"
@@ -154,9 +182,7 @@ export default function SidebarPanel({
                 영감 검색
               </button>
               <button
-                onClick={() => {
-                  setInspirationSubTab("archive");
-                }}
+                onClick={() => setInspirationSubTab("archive")}
                 className={cn(
                   "flex-1 text-center py-2 text-[11px] font-bold rounded-lg transition-all",
                   inspirationSubTab === "archive"
@@ -226,9 +252,7 @@ export default function SidebarPanel({
                     </span>
                     <select 
                       value={archiveFilter}
-                      onChange={(e) => {
-                        setArchiveFilter(e.target.value);
-                      }}
+                      onChange={(e) => setArchiveFilter(e.target.value)}
                       className={cn(
                         "w-full px-3 py-2 text-xs font-bold outline-none border rounded-xl appearance-none cursor-pointer",
                         isDarkMode ? "bg-zinc-900 border-zinc-800 text-zinc-300" : "bg-white border-zinc-200 text-zinc-800"
@@ -248,9 +272,7 @@ export default function SidebarPanel({
                     </span>
                     <select 
                       value={archiveSort}
-                      onChange={(e) => {
-                        setArchiveSort(e.target.value);
-                      }}
+                      onChange={(e) => setArchiveSort(e.target.value)}
                       className={cn(
                         "w-full px-3 py-2 text-xs font-bold outline-none border rounded-xl appearance-none cursor-pointer",
                         isDarkMode ? "bg-zinc-900 border-zinc-800 text-zinc-300" : "bg-white border-zinc-200 text-zinc-800"
@@ -334,18 +356,17 @@ export default function SidebarPanel({
               
               {[
                 { id: "info", label: "프로젝트 정보", icon: Info, color: "text-blue-400" },
+                { id: "world", label: "세계관 설정", icon: Globe, color: "text-cyan-400" },
                 { id: "characters", label: "캐릭터 맵", icon: Users, color: "text-emerald-400" },
                 { id: "plot", label: "플롯 이벤트", icon: GitCommit, color: "text-purple-400" },
-                { id: "draft", label: "초안 & 시놉시스", icon: FileText, color: "text-pink-400" },
-                { id: "editor", label: "대본 작성기", icon: PenTool, color: "text-amber-400" }
+                { id: "draft", label: "초안 & 시놉시스", icon: FileText, color: "text-pink-400" },                  
+                { id: "editor", label: "대본 작성기", icon: PenTool, color: "text-amber-400" }                  
               ].map(menu => {
                 const isSelected = activeWorkspaceTab === menu.id;
                 return (
                   <button
                     key={menu.id}
-                    onClick={() => {
-                      setWorkspaceTab(menu.id as any);
-                    }}
+                    onClick={() => setWorkspaceTab(menu.id as any)}
                     className={cn(
                       "w-full flex items-center justify-between px-3 py-3.5 rounded-xl text-left transition-all active:scale-95 group",
                       isSelected
@@ -362,11 +383,10 @@ export default function SidebarPanel({
                 );
               })}
             </div>
-
-
           </div>
         </div>
       )}
+      
       <input 
         type="file" 
         ref={fileInputRef} 
@@ -375,6 +395,5 @@ export default function SidebarPanel({
         accept=".json" 
       />
     </aside>
-
   );
 }

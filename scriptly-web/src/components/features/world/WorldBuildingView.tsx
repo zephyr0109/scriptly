@@ -1,9 +1,16 @@
 "use client";
 
 import React, { useEffect, useState, useMemo, useCallback } from "react";
-import { Plus, Trash2, Folder, Globe, ShieldAlert, FileText, ChevronDown, ChevronRight, Save, Loader2, Compass } from "lucide-react";
+import { Trash2, Plus, Save, Loader2, Globe, ShieldAlert } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useWorldSettings, WorldStage, WorldFaction, WorldRuleCulture, WorldGlossary, WorldNote } from "@/hooks/useWorldSettings";
+
+// 분리된 하위 컴포넌트들 Import
+import WorldStageExplorer, { CategoryType, SelectedItem } from "./WorldStageExplorer";
+import WorldStageForm from "./forms/WorldStageForm";
+import WorldFactionForm from "./forms/WorldFactionForm";
+import WorldRuleCultureForm from "./forms/WorldRuleCultureForm";
+import WorldGlossaryGrid from "./forms/WorldGlossaryGrid";
 
 interface WorldBuildingViewProps {
   projectId: string;
@@ -11,13 +18,10 @@ interface WorldBuildingViewProps {
   addToast: (msg: string, type?: "success" | "info" | "warning" | "error") => void;
 }
 
-type CategoryType = "stage" | "faction" | "rule" | "glossary" | "note";
-
-interface SelectedItem {
-  id: string;
-  category: CategoryType;
-}
-
+/**
+ * WorldBuildingView 컴포넌트 (세계관 설정실)
+ * 드라마의 시공간 무대, 세력/집단, 제도/문화, 용어 사전, 자유 메모 등을 생성 및 편집하는 최상위 오케스트레이션 컴포넌트입니다.
+ */
 export default function WorldBuildingView({ projectId, isDarkMode, addToast }: WorldBuildingViewProps) {
   const {
     stages, factions, rules, glossary, notes, isLoading, fetchAllWorldData,
@@ -139,14 +143,14 @@ export default function WorldBuildingView({ projectId, isDarkMode, addToast }: W
   }, [selected, activeItem, formName, formFields]);
 
   // Dirty check wrapper
-  const executeWithDirtyCheck = (action: () => void) => {
+  const executeWithDirtyCheck = useCallback((action: () => void) => {
     if (checkIsDirty()) {
       setPendingAction(() => action);
       setShowUnsavedModal(true);
     } else {
       action();
     }
-  };
+  }, [checkIsDirty]);
 
   // Synchronize form state when active item changes
   useEffect(() => {
@@ -319,253 +323,42 @@ export default function WorldBuildingView({ projectId, isDarkMode, addToast }: W
     }
   };
 
-  // Build recursive stage tree hierarchy
-  const renderStageTree = (parentId: string | null, depth = 0) => {
-    const childStages = stages.filter(s => (parentId === null ? !s.parent_id : s.parent_id === parentId));
-    return childStages.map(stage => {
-      const isSel = selected?.id === stage.id && selected?.category === "stage";
-      return (
-        <div key={stage.id} className="w-full">
-          <div
-            style={{ paddingLeft: `${depth * 12 + 16}px` }}
-            className={cn(
-              "w-full py-2.5 pr-4 rounded-xl text-xs flex items-center justify-between transition-all hover:bg-zinc-800/40 group cursor-pointer",
-              isSel ? "bg-amber-500/10 border-l-2 border-amber-500" : ""
-            )}
-            onClick={() => executeWithDirtyCheck(() => setSelected({ id: stage.id, category: "stage" }))}
-          >
-            <div className="flex items-center gap-2 truncate flex-1">
-              <Compass size={13} className={isSel ? "text-amber-400" : "text-zinc-500"} />
-              <span className={cn("truncate flex-1", isSel ? "text-amber-400 font-extrabold" : "text-zinc-400")}>{stage.name}</span>
-              {stage.era && <span className="text-[9px] px-1.5 py-0.5 bg-zinc-800 rounded text-zinc-500 font-medium shrink-0">{stage.era}</span>}
-            </div>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                executeWithDirtyCheck(() => handleCreateSubStage(stage.id));
-              }}
-              className="p-1 hover:bg-zinc-800 rounded text-zinc-500 hover:text-amber-400 opacity-0 group-hover:opacity-100 transition-opacity ml-1.5 shrink-0"
-              title="하위 무대 추가"
-            >
-              <Plus size={11} />
-            </button>
-          </div>
-          {renderStageTree(stage.id, depth + 1)}
-        </div>
-      );
-    });
-  };
-
   return (
     <div className={cn("w-full h-full flex overflow-hidden rounded-[2.5rem] border", isDarkMode ? "bg-[#09090C] border-zinc-900" : "bg-white border-zinc-200 shadow-xl")}>
       
       {/* LEFT PANEL: Category Explorer */}
-      <div className={cn("w-72 border-r h-full flex flex-col shrink-0 select-none", isDarkMode ? "bg-[#0C0C10] border-zinc-900" : "bg-zinc-50/50 border-zinc-200")}>
-        <div className="flex-1 overflow-y-auto pt-6 px-4 pb-4 space-y-3 custom-scrollbar-dark">
-          
-          {/* 1. 시공간 무대 Accordion */}
-          <div className="space-y-1">
-            <div className="flex items-center justify-between px-2 py-1">
-              <button onClick={() => toggleCategory("stage")} className="flex items-center gap-1.5 text-[10px] font-black text-zinc-500 hover:text-white transition-all uppercase tracking-wider">
-                {expanded.stage ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
-                시공간 무대 (STAGES)
-              </button>
-              <button onClick={() => executeWithDirtyCheck(() => handleAddNewItem("stage"))} className="p-1 hover:bg-zinc-800 rounded text-amber-500 hover:text-amber-400" title="새 무대 추가">
-                <Plus size={12} />
-              </button>
-            </div>
-            {expanded.stage && <div className="space-y-0.5 mt-1">{renderStageTree(null)}</div>}
-          </div>
-
-          {/* 2. 세력/집단 Accordion */}
-          <div className="space-y-1 pt-2">
-            <div className="flex items-center justify-between px-2 py-1">
-              <button onClick={() => toggleCategory("faction")} className="flex items-center gap-1.5 text-[10px] font-black text-zinc-500 hover:text-white transition-all uppercase tracking-wider">
-                {expanded.faction ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
-                세력/집단 (FACTIONS)
-              </button>
-              <button onClick={() => executeWithDirtyCheck(() => handleAddNewItem("faction"))} className="p-1 hover:bg-zinc-800 rounded text-amber-500 hover:text-amber-400" title="새 집단 추가">
-                <Plus size={12} />
-              </button>
-            </div>
-            {expanded.faction && factions.map(f => {
-              const isSel = selected?.id === f.id && selected?.category === "faction";
-              return (
-                <button
-                  key={f.id}
-                  onClick={() => executeWithDirtyCheck(() => setSelected({ id: f.id, category: "faction" }))}
-                  className={cn(
-                    "w-full text-left py-2.5 px-4 rounded-xl text-xs flex items-center gap-2 transition-all hover:bg-zinc-800/40",
-                    isSel ? "bg-amber-500/10 text-amber-400 font-extrabold border-l-2 border-amber-500" : "text-zinc-400"
-                  )}
-                >
-                  <Folder size={13} className={isSel ? "text-amber-400" : "text-zinc-500"} />
-                  <span className="truncate flex-1">{f.name}</span>
-                </button>
-              );
-            })}
-          </div>
-
-          {/* 3. 제도/문화 관습 Accordion */}
-          <div className="space-y-1 pt-2">
-            <div className="flex items-center justify-between px-2 py-1">
-              <button onClick={() => toggleCategory("rule")} className="flex items-center gap-1.5 text-[10px] font-black text-zinc-500 hover:text-white transition-all uppercase tracking-wider">
-                {expanded.rule ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
-                제도/문화 (RULES & CULTURES)
-              </button>
-              <button onClick={() => executeWithDirtyCheck(() => handleAddNewItem("rule"))} className="p-1 hover:bg-zinc-800 rounded text-amber-500 hover:text-amber-400" title="새 규칙 추가">
-                <Plus size={12} />
-              </button>
-            </div>
-            {expanded.rule && rules.map(r => {
-              const isSel = selected?.id === r.id && selected?.category === "rule";
-              return (
-                <button
-                  key={r.id}
-                  onClick={() => executeWithDirtyCheck(() => setSelected({ id: r.id, category: "rule" }))}
-                  className={cn(
-                    "w-full text-left py-2.5 px-4 rounded-xl text-xs flex items-center gap-2 transition-all hover:bg-zinc-800/40",
-                    isSel ? "bg-amber-500/10 text-amber-400 font-extrabold border-l-2 border-amber-500" : "text-zinc-400"
-                  )}
-                >
-                  <ShieldAlert size={13} className={isSel ? "text-amber-400" : "text-zinc-500"} />
-                  <span className="truncate flex-1">{r.name}</span>
-                  <span className={cn("text-[9px] px-1.5 py-0.5 rounded font-black", r.type === "RULE" ? "bg-red-500/10 text-red-400" : "bg-teal-500/10 text-teal-400")}>
-                    {r.type === "RULE" ? "법" : "문화"}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-
-          {/* 4. 용어 사전 Button */}
-          <div className="pt-2">
-            <button
-              onClick={() => executeWithDirtyCheck(() => setSelected({ id: "all", category: "glossary" }))}
-              className={cn(
-                "w-full text-left py-2.5 px-4 rounded-xl text-xs flex items-center justify-between transition-all hover:bg-zinc-800/40 font-black tracking-wider uppercase",
-                selected?.id === "all" && selected?.category === "glossary"
-                  ? "bg-amber-500/10 text-amber-400 font-extrabold border-l-2 border-amber-500"
-                  : "text-zinc-500 hover:text-white"
-              )}
-            >
-              <div className="flex items-center gap-2">
-                <Globe size={13} className={selected?.id === "all" && selected?.category === "glossary" ? "text-amber-400" : "text-zinc-500"} />
-                <span>용어 사전 (GLOSSARY)</span>
-              </div>
-              <span className="text-[9px] px-1.5 py-0.5 bg-zinc-800 dark:bg-zinc-900 rounded text-zinc-500 font-medium shrink-0">{glossary.length}</span>
-            </button>
-          </div>
-
-          {/* 5. 자유 메모 Accordion */}
-          <div className="space-y-1 pt-2">
-            <div className="flex items-center justify-between px-2 py-1">
-              <button onClick={() => toggleCategory("note")} className="flex items-center gap-1.5 text-[10px] font-black text-zinc-500 hover:text-white transition-all uppercase tracking-wider">
-                {expanded.note ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
-                자유 메모 (WORLD NOTES)
-              </button>
-              <button onClick={() => executeWithDirtyCheck(() => handleAddNewItem("note"))} className="p-1 hover:bg-zinc-800 rounded text-amber-500 hover:text-amber-400" title="새 메모 추가">
-                <Plus size={12} />
-              </button>
-            </div>
-            {expanded.note && notes.map(n => {
-              const isSel = selected?.id === n.id && selected?.category === "note";
-              return (
-                <button
-                  key={n.id}
-                  onClick={() => executeWithDirtyCheck(() => setSelected({ id: n.id, category: "note" }))}
-                  className={cn(
-                    "w-full text-left py-2.5 px-4 rounded-xl text-xs flex items-center gap-2 transition-all hover:bg-zinc-800/40",
-                    isSel ? "bg-amber-500/10 text-amber-400 font-extrabold border-l-2 border-amber-500" : "text-zinc-400"
-                  )}
-                >
-                  <FileText size={13} className={isSel ? "text-amber-400" : "text-zinc-500"} />
-                  <span className="truncate flex-1">{n.title}</span>
-                </button>
-              );
-            })}
-          </div>
-
-        </div>
-      </div>
+      <WorldStageExplorer
+        stages={stages}
+        factions={factions}
+        rules={rules}
+        glossary={glossary}
+        notes={notes}
+        selected={selected}
+        expanded={expanded}
+        isDarkMode={isDarkMode}
+        toggleCategory={toggleCategory}
+        handleAddNewItem={handleAddNewItem}
+        handleCreateSubStage={handleCreateSubStage}
+        executeWithDirtyCheck={executeWithDirtyCheck}
+        setSelected={setSelected}
+      />
 
       {/* RIGHT PANEL: Form Editor or Table View */}
       <div className="flex-1 h-full flex flex-col overflow-hidden bg-black/20">
         {selected && selected.id === "all" && selected.category === "glossary" ? (
-          <div className="flex flex-col h-full overflow-hidden">
-            {/* Table Header */}
-            <div className="p-6 border-b dark:border-zinc-900/60 flex justify-between items-center bg-[#0C0C10]/40">
-              <div>
-                <h2 className="text-base font-black text-white">용어 사전 일람표</h2>
-                <p className="text-[10px] text-zinc-500 mt-1">작품에 등장하는 고유 설정이나 인물들 간의 전문 용어를 통합 관리하는 일람표입니다.</p>
-              </div>
-              <button
-                onClick={() => executeWithDirtyCheck(() => handleAddNewItem("glossary"))}
-                className="flex items-center gap-2 px-5 py-2.5 bg-amber-500 hover:bg-amber-400 text-black font-black text-xs rounded-xl shadow-lg transition-all"
-              >
-                <Plus size={13} />
-                새 용어 추가
-              </button>
-            </div>
-
-            {/* Table Body */}
-            <div className="flex-1 overflow-auto p-8 custom-scrollbar-dark">
-              {glossary.length === 0 ? (
-                <div className="h-full flex flex-col items-center justify-center text-center opacity-40 select-none">
-                  <Globe size={40} className="text-zinc-500 mb-3" />
-                  <p className="text-xs text-zinc-400">등록된 용어가 없습니다.<br />우측 상단의 버튼을 눌러 첫 번째 용어를 추가해 보세요.</p>
-                </div>
-              ) : (
-                <div className="w-full border border-zinc-800/80 rounded-2xl overflow-hidden bg-zinc-950/20">
-                  <table className="w-full text-left border-collapse table-fixed">
-                    <thead>
-                      <tr className="bg-zinc-900/40 text-[10px] font-black text-zinc-400 uppercase tracking-widest border-b border-zinc-800 select-none">
-                        <th 
-                          onClick={() => setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc')}
-                          className="px-5 py-4 text-xs font-black w-[22%] cursor-pointer hover:bg-zinc-850/40 transition-colors group/hdr"
-                        >
-                          <div className="flex items-center gap-1.5">
-                            <span>용어 (Term)</span>
-                            {sortDirection === 'asc' && <span className="text-[10px] text-amber-500 font-extrabold">▲</span>}
-                            {sortDirection === 'desc' && <span className="text-[10px] text-amber-500 font-extrabold">▼</span>}
-                            {!sortDirection && <span className="text-[10px] text-zinc-600 opacity-0 group-hover/hdr:opacity-100 transition-opacity">↕</span>}
-                          </div>
-                        </th>
-                        <th className="px-5 py-4 text-xs font-black w-[40%]">정의 및 해설 (Definition)</th>
-                        <th className="px-5 py-4 text-xs font-black w-[32%]">사용 예시 (Usage Example)</th>
-                        <th className="px-5 py-4 text-xs font-black w-[6%] text-center">관리</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {sortedGlossary.map((entry) => (
-                        <GlossaryRow
-                          key={entry.id}
-                          entry={entry}
-                          onUpdate={handleUpdateGlossary}
-                          onDelete={async (id) => {
-                            setSelected({ id, category: "glossary" });
-                            setShowDeleteModal(true);
-                          }}
-                        />
-                      ))}
-                      {/* 인라인 새 용어 추가 단축 버튼 행 */}
-                      <tr className="hover:bg-zinc-800/10 transition-colors border-t border-zinc-900 bg-zinc-900/10">
-                        <td colSpan={4} className="px-3 py-2.5 text-center">
-                          <button
-                            onClick={() => executeWithDirtyCheck(() => handleAddNewItem("glossary"))}
-                            className="inline-flex items-center gap-1.5 px-5 py-2 text-zinc-500 hover:text-amber-400 font-bold text-xs rounded-xl hover:bg-zinc-800/30 transition-all outline-none"
-                          >
-                            <Plus size={13} />
-                            새 용어 행 추가
-                          </button>
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-          </div>
+          <WorldGlossaryGrid
+            glossary={glossary}
+            sortedGlossary={sortedGlossary}
+            sortDirection={sortDirection}
+            setSortDirection={setSortDirection}
+            handleAddNewItem={handleAddNewItem}
+            handleUpdateGlossary={handleUpdateGlossary}
+            handleDeleteGlossaryClick={(id) => {
+              setSelected({ id, category: "glossary" });
+              setShowDeleteModal(true);
+            }}
+            executeWithDirtyCheck={executeWithDirtyCheck}
+          />
         ) : activeItem && selected ? (
           <div className="flex flex-col h-full overflow-hidden">
             {/* Form Header */}
@@ -618,216 +411,31 @@ export default function WorldBuildingView({ projectId, isDarkMode, addToast }: W
 
               {/* 1. STAGES Form */}
               {selected.category === "stage" && (
-                <>
-                  <div className="grid grid-cols-2 gap-6">
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">시대 / 시점 (Era)</label>
-                      <input
-                        type="text"
-                        value={formFields.era || ""}
-                        onChange={e => setFormFields(prev => ({ ...prev, era: e.target.value }))}
-                        className="w-full px-5 py-3.5 bg-zinc-900 border border-zinc-800 rounded-xl text-xs font-semibold text-white outline-none focus:border-amber-500/50"
-                        placeholder="예: 1990년대, 조선 영조기, 2030년대"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">상위 시공간 (Parent Stage)</label>
-                      <select
-                        value={formFields.parent_id || ""}
-                        onChange={e => setFormFields(prev => ({ ...prev, parent_id: e.target.value || null }))}
-                        className="w-full px-5 py-3.5 bg-zinc-900 border border-zinc-800 rounded-xl text-xs font-semibold text-white outline-none focus:border-amber-500/50 appearance-none cursor-pointer"
-                      >
-                        <option value="">없음 (최상위 무대)</option>
-                        {stages.filter(s => s.id !== selected.id).map(s => (
-                          <option key={s.id} value={s.id}>{s.name} {s.era ? `(${s.era})` : ""}</option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-6">
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">분위기 / 무드 (Atmosphere)</label>
-                      <input
-                        type="text"
-                        value={formFields.atmosphere || ""}
-                        onChange={e => setFormFields(prev => ({ ...prev, atmosphere: e.target.value }))}
-                        className="w-full px-5 py-3.5 bg-zinc-900 border border-zinc-800 rounded-xl text-xs font-semibold text-white outline-none focus:border-amber-500/50"
-                        placeholder="예: 어둡고 습한 골목길, 화려하고 차가운 빌딩숲"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">기술 및 물리 인프라 (Tech Level)</label>
-                      <input
-                        type="text"
-                        value={formFields.technology_level || ""}
-                        onChange={e => setFormFields(prev => ({ ...prev, technology_level: e.target.value }))}
-                        className="w-full px-5 py-3.5 bg-zinc-900 border border-zinc-800 rounded-xl text-xs font-semibold text-white outline-none focus:border-amber-500/50"
-                        placeholder="예: 스마트폰 상용화 시점, 사이버네틱스 도입 완료"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">공간 설명 및 역사적 의의 (Description)</label>
-                    <textarea
-                      value={formFields.description || ""}
-                      onChange={e => setFormFields(prev => ({ ...prev, description: e.target.value }))}
-                      className="w-full h-44 px-5 py-4 bg-zinc-900 border border-zinc-800 rounded-xl text-xs font-semibold text-white outline-none focus:border-amber-500/50 resize-none custom-scrollbar-dark"
-                      placeholder="이 시공간적 장소에 대한 상세한 단상과 역사적 의의를 자유롭게 설명해 보세요."
-                    />
-                  </div>
-                </>
+                <WorldStageForm
+                  stages={stages}
+                  selectedId={selected.id}
+                  formFields={formFields}
+                  setFormFields={setFormFields}
+                />
               )}
 
               {/* 2. FACTIONS Form */}
               {selected.category === "faction" && (
-                <>
-                  <div className="grid grid-cols-2 gap-6">
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">세력 유형 (Type)</label>
-                      <input
-                        type="text"
-                        value={formFields.type || ""}
-                        onChange={e => setFormFields(prev => ({ ...prev, type: e.target.value }))}
-                        className="w-full px-5 py-3.5 bg-zinc-900 border border-zinc-800 rounded-xl text-xs font-semibold text-white outline-none focus:border-amber-500/50"
-                        placeholder="예: 사교 모임, 정당, 기업 카르텔, 비밀 단체"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">주요 거점 시공간 (Base Stage)</label>
-                      <select
-                        value={formFields.base_stage_id || ""}
-                        onChange={e => setFormFields(prev => ({ ...prev, base_stage_id: e.target.value || null }))}
-                        className="w-full px-5 py-3.5 bg-zinc-900 border border-zinc-800 rounded-xl text-xs font-semibold text-white outline-none focus:border-amber-500/50 appearance-none cursor-pointer"
-                      >
-                        <option value="">없음 (특정 거점 없음)</option>
-                        {stages.map(s => (
-                          <option key={s.id} value={s.id}>{s.name} {s.era ? `(${s.era})` : ""}</option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-6">
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">규모 및 위상 (Scale & Status)</label>
-                      <input
-                        type="text"
-                        value={formFields.scale_status || ""}
-                        onChange={e => setFormFields(prev => ({ ...prev, scale_status: e.target.value }))}
-                        className="w-full px-5 py-3.5 bg-zinc-900 border border-zinc-800 rounded-xl text-xs font-semibold text-white outline-none focus:border-amber-500/50"
-                        placeholder="예: 전체 구성원 약 20명, 법조계 내 막강한 로비력 보유"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">조직 계급 / 직급 체계 (Hierarchy)</label>
-                      <input
-                        type="text"
-                        value={formFields.hierarchy || ""}
-                        onChange={e => setFormFields(prev => ({ ...prev, hierarchy: e.target.value }))}
-                        className="w-full px-5 py-3.5 bg-zinc-900 border border-zinc-800 rounded-xl text-xs font-semibold text-white outline-none focus:border-amber-500/50"
-                        placeholder="예: 이사장 ➔ 외과 과장 ➔ 치프 레지던트 ➔ 레지던트"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">이념 및 집단 목표 (Ideology & Goal)</label>
-                    <textarea
-                      value={formFields.ideology_goal || ""}
-                      onChange={e => setFormFields(prev => ({ ...prev, ideology_goal: e.target.value }))}
-                      className="w-full h-24 px-5 py-3 bg-zinc-900 border border-zinc-800 rounded-xl text-xs font-semibold text-white outline-none focus:border-amber-500/50 resize-none custom-scrollbar-dark"
-                      placeholder="이 집단이 사수하거나 쟁취하고자 하는 궁극적인 이념과 신념 목표를 정의해 보세요."
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">집단 상세 설명 (Description)</label>
-                    <textarea
-                      value={formFields.description || ""}
-                      onChange={e => setFormFields(prev => ({ ...prev, description: e.target.value }))}
-                      className="w-full h-32 px-5 py-4 bg-zinc-900 border border-zinc-800 rounded-xl text-xs font-semibold text-white outline-none focus:border-amber-500/50 resize-none custom-scrollbar-dark"
-                      placeholder="집단에 대한 전반적인 소개 및 성향을 서술하세요."
-                    />
-                  </div>
-                </>
+                <WorldFactionForm
+                  stages={stages}
+                  formFields={formFields}
+                  setFormFields={setFormFields}
+                />
               )}
 
               {/* 3. RULES & CULTURES Form */}
               {selected.category === "rule" && (
-                <>
-                  <div className="grid grid-cols-3 gap-6">
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">분류 (Type)</label>
-                      <select
-                        value={formFields.type || "RULE"}
-                        onChange={e => setFormFields(prev => ({ ...prev, type: e.target.value }))}
-                        className="w-full px-5 py-3.5 bg-zinc-900 border border-zinc-800 rounded-xl text-xs font-semibold text-white outline-none focus:border-amber-500/50 appearance-none cursor-pointer"
-                      >
-                        <option value="RULE">📜 공식 제도 / 법률 (RULE)</option>
-                        <option value="CULTURE">🍃 비공식 사회 관습 / 문화 (CULTURE)</option>
-                      </select>
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">적용 시공간 무대 (Scope Stage)</label>
-                      <select
-                        value={formFields.scope_stage_id || ""}
-                        onChange={e => setFormFields(prev => ({ ...prev, scope_stage_id: e.target.value || null }))}
-                        className="w-full px-5 py-3.5 bg-zinc-900 border border-zinc-800 rounded-xl text-xs font-semibold text-white outline-none focus:border-amber-500/50 appearance-none cursor-pointer"
-                      >
-                        <option value="">전역 (특정 장소 한정 없음)</option>
-                        {stages.map(s => (
-                          <option key={s.id} value={s.id}>{s.name} {s.era ? `(${s.era})` : ""}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">적용 대상 세력 (Scope Faction)</label>
-                      <select
-                        value={formFields.scope_faction_id || ""}
-                        onChange={e => setFormFields(prev => ({ ...prev, scope_faction_id: e.target.value || null }))}
-                        className="w-full px-5 py-3.5 bg-zinc-900 border border-zinc-800 rounded-xl text-xs font-semibold text-white outline-none focus:border-amber-500/50 appearance-none cursor-pointer"
-                      >
-                        <option value="">모든 인물/전체</option>
-                        {factions.map(f => (
-                          <option key={f.id} value={f.id}>{f.name}</option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">작동 규칙 및 관습 상세 내용 (Content)</label>
-                    <textarea
-                      value={formFields.content || ""}
-                      onChange={e => setFormFields(prev => ({ ...prev, content: e.target.value }))}
-                      className="w-full h-32 px-5 py-3 bg-zinc-900 border border-zinc-800 rounded-xl text-xs font-semibold text-white outline-none focus:border-amber-500/50 resize-none custom-scrollbar-dark"
-                      placeholder="제도나 관습이 구체적으로 어떤 방식으로 작동하며, 어떤 제약이 생기는지 서술하세요."
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-6">
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">사회적 / 인물 영향 (Impact)</label>
-                      <textarea
-                        value={formFields.impact || ""}
-                        onChange={e => setFormFields(prev => ({ ...prev, impact: e.target.value }))}
-                        className="w-full h-28 px-5 py-3 bg-zinc-900 border border-zinc-800 rounded-xl text-xs font-semibold text-white outline-none focus:border-amber-500/50 resize-none custom-scrollbar-dark"
-                        placeholder="이 룰이나 관습 때문에 캐릭터들이 겪는 내외적 딜레마나 압박을 정리해 보세요."
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">예외 사항 / 설정 틈새 (Exceptions)</label>
-                      <textarea
-                        value={formFields.exceptions || ""}
-                        onChange={e => setFormFields(prev => ({ ...prev, exceptions: e.target.value }))}
-                        className="w-full h-28 px-5 py-3 bg-zinc-900 border border-zinc-800 rounded-xl text-xs font-semibold text-white outline-none focus:border-amber-500/50 resize-none custom-scrollbar-dark"
-                        placeholder="이야기 전개 시 극적으로 활용될 수 있는 규칙의 허점이나 비공식 예외 규정을 기록하세요."
-                      />
-                    </div>
-                  </div>
-                </>
+                <WorldRuleCultureForm
+                  stages={stages}
+                  factions={factions}
+                  formFields={formFields}
+                  setFormFields={setFormFields}
+                />
               )}
 
               {/* 4. GLOSSARY Form */}
@@ -991,87 +599,5 @@ function DeleteConfirmModal({ isOpen, onClose, onConfirm, title }: DeleteConfirm
         </div>
       </div>
     </div>
-  );
-}
-
-// --- Inline Editable Glossary Row Component ---
-interface GlossaryRowProps {
-  entry: WorldGlossary;
-  onUpdate: (id: string, updates: Partial<WorldGlossary>) => Promise<any>;
-  onDelete: (id: string) => Promise<any>;
-}
-
-function GlossaryRow({ entry, onUpdate, onDelete }: GlossaryRowProps) {
-  const [term, setTerm] = useState(entry.term);
-  const [definition, setDefinition] = useState(entry.definition || "");
-  const [usageExample, setUsageExample] = useState(entry.usage_example || "");
-  const [isSaving, setIsSaving] = useState(false);
-
-  // Sync state if source array updates
-  useEffect(() => {
-    setTerm(entry.term);
-    setDefinition(entry.definition || "");
-    setUsageExample(entry.usage_example || "");
-  }, [entry]);
-
-  const handleSaveField = async (updatedFields: Partial<WorldGlossary>) => {
-    setIsSaving(true);
-    try {
-      await onUpdate(entry.id, updatedFields);
-    } catch (e) {
-      console.error("Failed to update inline glossary:", e);
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  return (
-    <tr className="hover:bg-zinc-800/10 border-b border-zinc-900 last:border-0 transition-colors group">
-      <td className="px-3 py-1.5 text-xs">
-        <input
-          type="text"
-          value={term}
-          onChange={(e) => setTerm(e.target.value)}
-          onBlur={() => term !== entry.term && handleSaveField({ term })}
-          className="w-full bg-transparent border-0 focus:bg-zinc-900/60 focus:ring-1 focus:ring-amber-500/50 rounded px-2.5 py-1.5 outline-none font-bold text-amber-400/90"
-          placeholder="용어 입력..."
-        />
-      </td>
-      <td className="px-3 py-1.5 text-xs">
-        <textarea
-          value={definition}
-          onChange={(e) => setDefinition(e.target.value)}
-          onBlur={() => definition !== (entry.definition || "") && handleSaveField({ definition })}
-          rows={1}
-          className="w-full bg-transparent border-0 focus:bg-zinc-900/60 focus:ring-1 focus:ring-amber-500/50 rounded px-2.5 py-1.5 outline-none text-zinc-300 resize-y min-h-[32px] custom-scrollbar-dark"
-          placeholder="정의 및 해설 입력..."
-        />
-      </td>
-      <td className="px-3 py-1.5 text-xs">
-        <textarea
-          value={usageExample}
-          onChange={(e) => setUsageExample(e.target.value)}
-          onBlur={() => usageExample !== (entry.usage_example || "") && handleSaveField({ usage_example: usageExample })}
-          rows={1}
-          className="w-full bg-transparent border-0 focus:bg-zinc-900/60 focus:ring-1 focus:ring-amber-500/50 rounded px-2.5 py-1.5 outline-none text-zinc-400 resize-y min-h-[32px] custom-scrollbar-dark"
-          placeholder="사용 예시 입력..."
-        />
-      </td>
-      <td className="px-3 py-1.5 text-xs w-16 text-center">
-        <div className="flex items-center justify-center gap-1.5">
-          {isSaving ? (
-            <Loader2 size={12} className="animate-spin text-amber-500" />
-          ) : (
-            <button
-              onClick={() => onDelete(entry.id)}
-              className="p-1.5 text-zinc-600 hover:text-rose-500 hover:bg-rose-500/10 rounded transition-all opacity-0 group-hover:opacity-100"
-              title="용어 삭제"
-            >
-              <Trash2 size={12} />
-            </button>
-          )}
-        </div>
-      </td>
-    </tr>
   );
 }
